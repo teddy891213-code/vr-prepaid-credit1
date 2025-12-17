@@ -1,225 +1,233 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>2D 打鳥學支付｜儲值卡 vs 信用卡（穩定版）</title>
-<style>
-  html,body{margin:0;height:100%;background:#08131f;color:#eef2ff;font-family:system-ui,-apple-system,"Noto Sans TC";}
-  #app{position:fixed;inset:0;display:flex;flex-direction:column}
-  header,footer{
-    padding:10px 12px;background:rgba(0,0,0,.55);
-    border-bottom:1px solid rgba(255,255,255,.12);
-    display:flex;gap:10px;align-items:center;justify-content:space-between
-  }
-  footer{border-top:1px solid rgba(255,255,255,.12);border-bottom:none}
-  .pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);
-    border:1px solid rgba(255,255,255,.14);font-size:13px}
-  button{background:rgba(255,255,255,.1);color:#eef2ff;border:1px solid rgba(255,255,255,.18);
-    border-radius:10px;padding:8px 12px;font-size:14px}
-  #stage{flex:1;position:relative;overflow:hidden}
-  canvas{width:100%;height:100%;display:block}
-  .overlay{
-    position:absolute;inset:0;background:rgba(0,0,0,.35);
-    display:flex;align-items:center;justify-content:center
-  }
-  .card{
-    background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.18);
-    border-radius:16px;padding:16px;max-width:900px;width:92%
-  }
-  .q{font-size:22px;font-weight:900;line-height:1.35;margin-bottom:8px}
-  .hint{color:#c9d3ff}
-  .bar{height:10px;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}
-  .fill{height:100%;width:0;background:linear-gradient(90deg,#7bd6ff,#bda7ff)}
-  #fx{position:absolute;inset:0;pointer-events:none}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>打鴨子學金融：儲值卡 vs 信用卡</title>
+  <style>
+    html, body { margin:0; height:100%; background:#0b0f1a; color:#fff; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
+    #wrap { display:flex; flex-direction:column; height:100%; }
+    #topbar {
+      padding: 10px 12px;
+      background: rgba(0,0,0,.45);
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .pill { border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:2px 10px; font-size:12px; opacity:.95; }
+    #question { font-weight:700; }
+    #sub { opacity:.9; font-size:13px; margin-top:4px; }
+    #panel { padding:10px 12px; background: rgba(0,0,0,.35); border-top: 1px solid rgba(255,255,255,.08); }
+    button {
+      appearance:none; border:1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06);
+      color:#fff; padding:10px 12px; border-radius:12px; font-weight:700;
+    }
+    button:active { transform: scale(.99); }
+    #canvas { width:100%; flex:1; display:block; touch-action: manipulation; }
+    .hint { opacity:.9; font-size:13px; line-height:1.35; }
+    .warn { color:#ffd66b; }
+  </style>
 </head>
 <body>
-<div id="app">
-  <header>
-    <span class="pill">2D 打鳥學支付（穩定）</span>
-    <span class="pill" id="stat">第 1 題</span>
-  </header>
-
-  <div id="stage">
-    <canvas id="c"></canvas>
-    <canvas id="fx"></canvas>
-
-    <!-- 讀題 -->
-    <div class="overlay" id="read">
-      <div class="card">
-        <div class="q" id="qText">—</div>
-        <div class="hint" id="qHint">—</div>
-        <div class="bar"><div class="fill" id="fill"></div></div>
-        <div class="hint" style="margin-top:8px">5 秒後開始，點一下射擊答案</div>
-      </div>
+<div id="wrap">
+  <div id="topbar">
+    <div class="pill">分數：<span id="score">0</span></div>
+    <div class="pill">生命：<span id="hp">3</span></div>
+    <div class="pill">連對：<span id="streak">0</span></div>
+    <div class="pill">倒數：<span id="time">10</span>s</div>
+    <div style="flex:1; min-width:200px;">
+      <div id="question">按「開始」出題</div>
+      <div id="sub" class="hint">玩法：看題目 → 點擊/點觸正確鴨子。打錯會扣生命。</div>
     </div>
+    <button id="btnStart">開始</button>
+    <button id="btnRestart" style="display:none;">重來</button>
   </div>
 
-  <footer>
-    <span class="pill" id="msg">點一下射擊</span>
-    <button id="next">下一題</button>
-  </footer>
+  <canvas id="canvas"></canvas>
+
+  <div id="panel">
+    <div class="hint">
+      <span class="warn">教學核心：</span>
+      儲值卡＝先儲值（預付）→再消費（扣餘額）；
+      信用卡＝先消費→銀行先墊款→你之後繳款（延後給付）。
+    </div>
+  </div>
 </div>
 
 <script>
-/* ===== 題庫（情境 → 特性） ===== */
-const BANK = [
-  {
-    q:"帳戶裡其實沒錢，但你還是能先買東西，下個月再付錢。這反映哪個特性？",
-    hint:"看『付款時點』，不是看卡片名字。",
-    correct:"先消費後付款",
-    opts:[
-      "先消費後付款",
-      "需要先儲值",
-      "即時扣款",
-      "花費上限等於餘額"
-    ]
-  },
-  {
-    q:"你把卡交給家人代買，希望『最多只能花到你先放進去的金額』。",
-    hint:"重點是『不能超支』。",
-    correct:"花費上限等於已儲值金額",
-    opts:[
-      "花費上限等於已儲值金額",
-      "先消費後付款",
-      "有帳單日",
-      "銀行先墊款"
-    ]
-  },
-  {
-    q:"每刷一次就立刻看到餘額變少，幫助你控制花費。",
-    hint:"看『是否即時反映』。",
-    correct:"即時扣款",
-    opts:[
-      "即時扣款",
-      "月底帳單結算",
-      "信用額度",
-      "銀行墊款"
-    ]
-  },
-  {
-    q:"網購遇到爭議，能先凍結款項、再決定是否付款。",
-    hint:"誰先承擔風險？",
-    correct:"可申請爭議款/拒付",
-    opts:[
-      "可申請爭議款/拒付",
-      "需要先儲值",
-      "即時扣款",
-      "花費上限等於餘額"
-    ]
+(() => {
+  // ===== Canvas setup =====
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
   }
-];
+  window.addEventListener('resize', resize);
+  resize();
 
-/* ===== Canvas ===== */
-const c = document.getElementById('c');
-const fx = document.getElementById('fx');
-const ctx = c.getContext('2d');
-const fctx = fx.getContext('2d');
-const stage = document.getElementById('stage');
-function resize(){
-  const dpr = devicePixelRatio||1;
-  c.width = stage.clientWidth*dpr;
-  c.height = stage.clientHeight*dpr;
-  fx.width = c.width; fx.height = c.height;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  fctx.setTransform(dpr,0,0,dpr,0,0);
-}
-window.addEventListener('resize',resize); resize();
+  // ===== UI =====
+  const elScore = document.getElementById('score');
+  const elHp = document.getElementById('hp');
+  const elStreak = document.getElementById('streak');
+  const elTime = document.getElementById('time');
+  const elQ = document.getElementById('question');
+  const elSub = document.getElementById('sub');
+  const btnStart = document.getElementById('btnStart');
+  const btnRestart = document.getElementById('btnRestart');
 
-/* ===== 狀態 ===== */
-let i=0, birds=[], running=false, timer=null;
-const stat=document.getElementById('stat');
-const read=document.getElementById('read');
-const qText=document.getElementById('qText');
-const qHint=document.getElementById('qHint');
-const fill=document.getElementById('fill');
-const msg=document.getElementById('msg');
+  // ===== Question bank (可擴充) =====
+  // 每題：prompt + options (2~4)；正確答案 index
+  const QUESTIONS = [
+    {
+      prompt: "哪個是「儲值卡」的正確流程？",
+      options: ["先儲值 → 再消費", "先消費 → 後繳款", "先消費 → 再儲值"],
+      correct: 0,
+      explain: "儲值卡是預付：先把錢存進去，消費時扣餘額。"
+    },
+    {
+      prompt: "哪個是「信用卡」的正確流程？",
+      options: ["先儲值 → 再消費", "先消費 → 後繳款", "先繳款 → 再消費"],
+      correct: 1,
+      explain: "信用卡是延後給付：先消費，之後收到帳單再付錢。"
+    },
+    {
+      prompt: "你刷信用卡買東西時，誰先把錢付給商店？",
+      options: ["你本人當下付", "銀行/發卡機構先墊款", "商店自己吸收"],
+      correct: 1,
+      explain: "信用卡交易中，銀行/發卡機構會先付給商店（你之後再繳款）。"
+    },
+    {
+      prompt: "你用儲值卡付費時，扣的是哪裡的錢？",
+      options: ["卡內餘額", "銀行先墊的款", "月底帳單"],
+      correct: 0,
+      explain: "儲值卡消費會直接扣卡內餘額。"
+    },
+    {
+      prompt: "看到『月底帳單』這個關鍵字，最可能是哪一種？",
+      options: ["儲值卡", "信用卡", "兩者都一定有帳單"],
+      correct: 1,
+      explain: "月底帳單＝信用卡典型特徵（延後給付）。"
+    }
+  ];
 
-/* ===== 鳥 ===== */
-function spawn(){
-  birds=[];
-  const q=BANK[i];
-  const opts=[...q.opts].sort(()=>Math.random()-.5);
-  opts.forEach((t,idx)=>{
-    birds.push({
-      t, ok:t===q.correct,
-      x:Math.random()*0.8, y:0.1+Math.random()*0.7,
-      vx:(Math.random()>.5?1:-1)*0.06,
-      vy:(Math.random()>.5?1:-1)*0.04
-    });
-  });
-  running=true;
-}
+  // ===== Game state =====
+  let running = false;
+  let score = 0, hp = 3, streak = 0;
+  let timeLeft = 10;
+  let timerId = null;
 
-/* ===== 畫面 ===== */
-function draw(){
-  ctx.clearRect(0,0,c.width,c.height);
-  birds.forEach(b=>{
-    b.x+=b.vx; b.y+=b.vy;
-    if(b.x<0||b.x>0.8)b.vx*=-1;
-    if(b.y<0.05||b.y>0.85)b.vy*=-1;
+  let currentQ = null;
+  let ducks = []; // {x,y,w,h,vx,vy,label,isCorrect,hit}
 
-    const X=b.x*c.width, Y=b.y*c.height;
-    ctx.fillStyle=b.ok?"rgba(90,220,160,.85)":"rgba(255,120,120,.85)";
-    ctx.fillRect(X,Y,300,64);
-    ctx.fillStyle="#000"; ctx.font="20px sans-serif";
-    ctx.fillText(b.t,X+12,Y+40);
-  });
-  requestAnimationFrame(draw);
-}
-draw();
+  function setHud() {
+    elScore.textContent = String(score);
+    elHp.textContent = String(hp);
+    elStreak.textContent = String(streak);
+    elTime.textContent = String(timeLeft);
+  }
 
-/* ===== 特效 ===== */
-function hit(x,y){
-  fctx.clearRect(0,0,fx.width,fx.height);
-  fctx.strokeStyle="rgba(255,255,255,.9)";
-  fctx.lineWidth=3;
-  fctx.beginPath();
-  fctx.arc(x,y,22,0,Math.PI*2); fctx.stroke();
-  setTimeout(()=>fctx.clearRect(0,0,fx.width,fx.height),120);
-}
+  function pickQuestion() {
+    // random question
+    currentQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+    elQ.textContent = currentQ.prompt;
+    elSub.textContent = "提示：點到正確鴨子得分；打錯扣生命。";
+  }
 
-/* ===== 互動 ===== */
-stage.addEventListener('pointerdown',e=>{
-  if(!running)return;
-  const rect=stage.getBoundingClientRect();
-  const x=(e.clientX-rect.left)/rect.width;
-  const y=(e.clientY-rect.top)/rect.height;
-  hit(x*c.width,y*c.height);
-  for(const b of birds){
-    if(x>b.x && x<b.x+0.3 && y>b.y && y<b.y+0.12){
-      msg.textContent=b.ok?"✅ 正確":"❌ 再想想";
-      running=false;
-      return;
+  function spawnDucks() {
+    ducks = [];
+    const W = canvas.getBoundingClientRect().width;
+    const H = canvas.getBoundingClientRect().height;
+
+    const opts = currentQ.options.map((text, i) => ({
+      text, isCorrect: i === currentQ.correct
+    }));
+
+    // 2~4 隻同時出現：用全部 options
+    const count = opts.length;
+
+    for (let i = 0; i < count; i++) {
+      const w = 180, h = 70;
+      const x = -w - Math.random() * 120;              // 從左外面飛入
+      const y = 80 + i * (Math.min(110, (H-160)/(count))) + (Math.random()*20-10);
+      const speed = 80 + Math.random()*60;             // px/s
+      ducks.push({
+        x, y, w, h,
+        vx: speed,
+        vy: (Math.random()*20 - 10),
+        label: opts[i].text,
+        isCorrect: opts[i].isCorrect,
+        hit: false
+      });
     }
   }
-});
 
-/* ===== 讀題 ===== */
-function start(){
-  const q=BANK[i];
-  stat.textContent=`第 ${i+1} 題`;
-  qText.textContent=q.q;
-  qHint.textContent=q.hint;
-  fill.style.width="0%";
-  read.style.display="flex";
-  let t=0;
-  timer=setInterval(()=>{
-    t++; fill.style.width=(t/5*100)+"%";
-    if(t>=5){
-      clearInterval(timer);
-      read.style.display="none";
-      spawn();
+  function startRound() {
+    timeLeft = 10;
+    pickQuestion();
+    spawnDucks();
+    setHud();
+
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+      if (!running) return;
+      timeLeft -= 1;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        setHud();
+        // 沒打到正確也算失敗
+        onMissed();
+      } else {
+        setHud();
+      }
+    }, 1000);
+  }
+
+  function onCorrect() {
+    score += 10 + Math.min(10, streak * 2);
+    streak += 1;
+    elSub.textContent = "✅ 正確！" + currentQ.explain;
+    startRound();
+  }
+
+  function onWrong(msg) {
+    hp -= 1;
+    streak = 0;
+    elSub.textContent = "❌ 錯誤！" + (msg || currentQ.explain);
+    if (hp <= 0) {
+      endGame();
+    } else {
+      startRound();
     }
-  },1000);
-}
-document.getElementById('next').onclick=()=>{
-  i=(i+1)%BANK.length;
-  start();
-};
+  }
 
-start();
-</script>
-</body>
-</html>
+  function onMissed() {
+    hp -= 1;
+    streak = 0;
+    elSub.textContent = "⌛ 超時！" + currentQ.explain;
+    if (hp <= 0) endGame();
+    else startRound();
+  }
+
+  function endGame() {
+    running = false;
+    clearInterval(timerId);
+    elSub.textContent = `遊戲結束。你的分數：${score}。按「重來」再玩一次。`;
+    btnStart.style.display = "none";
+    btnRestart.style.display = "inline-block";
+  }
+
+  // ===== Render loop =====
+  let lastT = performance.now();
+  function loop(t) {
+    const dt = Math.min(0.05, (t - lastT) / 1000);
+    lastT = t;
+
+    const W = canvas.getBoundingClientRect().width;
+    const H = canvas.getBoundingClientRect().height;
+
+    // background
+    ctx.fillStyle
