@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>2D 打鳥學流程：儲值卡 vs 信用卡（頭瞄準＋點擊射擊）</title>
+  <title>2D 打鳥學流程：儲值卡 vs 信用卡（陀螺儀瞄準可選）</title>
+
   <style>
     :root{
       --bg:#061018;
@@ -42,7 +43,7 @@
     .spacer{flex:1}
     .ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     label{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;}
-    input[type=range]{width:180px;}
+    input[type=range]{width:160px;}
     select,button{
       background:rgba(0,0,0,.35); color:var(--txt);
       border:1px solid var(--line); border-radius:10px;
@@ -52,6 +53,8 @@
     button:hover{border-color:rgba(255,255,255,.28)}
     button.primary{border-color:rgba(123,214,255,.5); box-shadow:0 0 18px rgba(123,214,255,.10);}
     button.danger{border-color:rgba(255,104,104,.45);}
+    button.good{border-color:rgba(70,211,138,.45);}
+    button.small{padding:6px 10px; font-size:13px; border-radius:999px;}
 
     /* 問題區（置中大卡） */
     #qBar{
@@ -100,9 +103,10 @@
       min-height:420px;
     }
 
-    /* 準星（VR 頭瞄準：固定正中央） */
+    /* 準星（可移動，陀螺儀模式會跟著跑） */
     #reticle{
-      position:absolute; left:50%; top:50%;
+      position:absolute;
+      left:50%; top:50%;
       width:18px; height:18px;
       transform:translate(-50%,-50%);
       pointer-events:none;
@@ -110,6 +114,7 @@
       border-radius:999px;
       box-shadow:0 0 0 6px rgba(123,214,255,.14), 0 0 24px rgba(123,214,255,.18);
       z-index:20;
+      will-change:left, top;
     }
     #reticle:before, #reticle:after{
       content:""; position:absolute; left:50%; top:50%;
@@ -117,6 +122,41 @@
       transform:translate(-50%,-50%);
     }
     #reticle:after{ width:10px; height:2px; }
+
+    /* 模式選擇面板（學生自行選） */
+    #modePanel{
+      position:absolute;
+      left:50%; top:50%;
+      transform:translate(-50%,-50%);
+      width:min(760px, 92%);
+      background:rgba(0,0,0,.62);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 20px 70px rgba(0,0,0,.45);
+      z-index:50;
+    }
+    #modePanel h3{
+      margin:0 0 6px;
+      font-size:16px;
+      font-weight:900;
+      display:flex;align-items:center;gap:8px;
+    }
+    #modePanel h3 .pin{
+      width:10px;height:10px;border-radius:50%;
+      background:var(--warn);
+      box-shadow:0 0 16px rgba(255,210,106,.25);
+    }
+    #modePanel p{
+      margin:6px 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+    #modeBtns{
+      display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;
+    }
+    #modeNote{margin-top:10px;color:var(--muted);font-size:13px}
 
     /* 中央題目卡（先讀題 5 秒） */
     #centerCard{
@@ -165,7 +205,7 @@
       background:linear-gradient(90deg, rgba(123,214,255,.9), rgba(189,167,255,.9));
     }
 
-    /* 鳥（可點擊但我們用準星中心判定） */
+    /* 鳥 */
     .bird{
       position:absolute;
       width:220px;
@@ -202,7 +242,6 @@
       -webkit-box-orient:vertical;
       overflow:hidden;
     }
-
     .bird.good{ border-color:rgba(70,211,138,.35); box-shadow:0 22px 70px rgba(70,211,138,.06); }
     .bird.bad{ border-color:rgba(255,104,104,.35); box-shadow:0 22px 70px rgba(255,104,104,.06); }
 
@@ -232,12 +271,8 @@
       opacity:.9;
       animation: flash .18s ease-out forwards;
     }
-    @keyframes ring{
-      to{ transform:scale(1); opacity:0; }
-    }
-    @keyframes flash{
-      to{ transform:scale(1.6); opacity:0; }
-    }
+    @keyframes ring{ to{ transform:scale(1); opacity:0; } }
+    @keyframes flash{ to{ transform:scale(1.6); opacity:0; } }
     .shake{ animation: shake .18s ease-in-out; }
     @keyframes shake{
       0%{transform:translate(0,0)}
@@ -263,12 +298,12 @@
     #flashMsg.ok{ color:var(--good); }
     #flashMsg.no{ color:var(--bad); }
 
-    /* 讓選項更大更好看（手機也能看清楚） */
     @media (max-width: 720px){
       #qMain{font-size:16px}
       #centerQ{font-size:16px}
       .bird{width:210px}
       .bird .opt{font-size:15px}
+      input[type=range]{width:140px;}
     }
   </style>
 </head>
@@ -297,6 +332,7 @@
       </label>
       <button class="primary" id="btnStart">開始 / 下一題</button>
       <button id="btnReset" class="danger">重來</button>
+      <button id="btnRecenter" class="small">重新校正準星</button>
     </div>
   </header>
 
@@ -305,13 +341,24 @@
       <span class="tag" id="chipFocus">焦點：—</span>
       <span class="tag" id="chipKey">關鍵：—</span>
       <span class="tag" id="chipTrap">常見誤區：—</span>
+      <span class="tag" id="chipAim">瞄準：未選擇</span>
     </div>
-    <div id="qMain">按「開始 / 下一題」開始。先讀題 5 秒，再開始打鳥。</div>
-    <div id="qMini">玩法：用頭瞄準（看準星），點一下射擊。打中「符合題意的特性」那隻鳥。</div>
+    <div id="qMain">先選擇瞄準方式（陀螺儀/中央準星）。</div>
+    <div id="qMini">玩法：點一下射擊。陀螺儀模式可用「轉動手機」移動準星。</div>
   </section>
 
   <main id="game" aria-label="game">
     <div id="reticle" aria-hidden="true"></div>
+
+    <div id="modePanel">
+      <h3><span class="pin"></span>先選瞄準方式</h3>
+      <p>你可以選：<b>陀螺儀瞄準</b>（轉手機＝準星移動）或 <b>中央準星</b>（不開陀螺儀）。</p>
+      <div id="modeBtns">
+        <button id="btnModeGyro" class="good">A：陀螺儀瞄準（推薦）</button>
+        <button id="btnModeCenter">B：中央準星（免授權）</button>
+      </div>
+      <div id="modeNote">iPhone 可能會跳出「允許動作與方向」授權；Android 多半直接可用。</div>
+    </div>
 
     <div id="centerCard" style="display:none;">
       <div id="centerHeadline">
@@ -333,6 +380,15 @@
 <script>
 (() => {
   const game = document.getElementById('game');
+
+  const modePanel = document.getElementById('modePanel');
+  const btnModeGyro = document.getElementById('btnModeGyro');
+  const btnModeCenter = document.getElementById('btnModeCenter');
+  const btnRecenter = document.getElementById('btnRecenter');
+  const chipAim = document.getElementById('chipAim');
+
+  const reticle = document.getElementById('reticle');
+
   const centerCard = document.getElementById('centerCard');
   const centerQ = document.getElementById('centerQ');
   const centerHint = document.getElementById('centerHint');
@@ -357,9 +413,7 @@
   const btnReset = document.getElementById('btnReset');
   const flashMsg = document.getElementById('flashMsg');
 
-  // ===== 題庫：每題問「情境需要的支付流程特性」 =====
-  // 你不是在選卡名，而是在選「特性」；最後才回推卡別（素養導向）
-  // correctKey 是正確特性 key
+  // ===== 題庫（素養導向：選特性） =====
   const BANK = [
     {
       stem: "你在遊戲裡想買道具，但你帳戶餘額不夠；平台仍讓你先買，下個月再一次繳清。這種支付流程的核心特性是？",
@@ -369,10 +423,10 @@
       hint: "看誰先：先得到商品？還是先付錢？",
       correctKey: "payLater",
       opts: [
-        { key:"payLater", label:"先消費後付款", sub:"先取得商品/服務，之後才在帳單日付款", icon:"🕊️" , kind:"credit"},
-        { key:"payNow", label:"先付款再消費", sub:"先把錢扣掉/扣餘額，才完成交易", icon:"🐦" , kind:"prepaid"},
-        { key:"limitLine", label:"有信用額度/授信", sub:"可超過現有存款額度，但受限於額度", icon:"🦅" , kind:"credit"},
-        { key:"topUp", label:"需要先儲值", sub:"先把錢加進卡/錢包餘額，才能使用", icon:"🦜" , kind:"prepaid"},
+        { key:"payLater", label:"先消費後付款", sub:"先取得商品/服務，之後才在帳單日付款", icon:"🕊️" },
+        { key:"payNow", label:"先付款再消費", sub:"先把錢扣掉/扣餘額，才完成交易", icon:"🐦" },
+        { key:"limitLine", label:"有信用額度/授信", sub:"可超過現有存款額度，但受限於額度", icon:"🦅" },
+        { key:"topUp", label:"需要先儲值", sub:"先把錢加進卡/錢包餘額，才能使用", icon:"🦜" },
       ]
     },
     {
@@ -383,10 +437,10 @@
       hint: "你要的是『不能超支』的機制。",
       correctKey: "capBalance",
       opts: [
-        { key:"capBalance", label:"花費上限＝卡內餘額", sub:"最多只能花到你先放進去的金額", icon:"🐤", kind:"prepaid"},
-        { key:"billLater", label:"先刷後繳（帳單）", sub:"月底/下月才結算付款", icon:"🕊️", kind:"credit"},
-        { key:"interest", label:"可能有循環利息", sub:"沒有一次繳清時，可能產生利息", icon:"🦉", kind:"credit"},
-        { key:"chargeback", label:"爭議款申訴/拒付", sub:"有機會申請爭議款處理（視規範）", icon:"🦢", kind:"credit"},
+        { key:"capBalance", label:"花費上限＝卡內餘額", sub:"最多只能花到你先放進去的金額", icon:"🐤" },
+        { key:"billLater", label:"先刷後繳（帳單）", sub:"月底/下月才結算付款", icon:"🕊️" },
+        { key:"interest", label:"未繳清可能有利息", sub:"沒有一次繳清時，可能產生利息", icon:"🦉" },
+        { key:"chargeback", label:"爭議款申訴/拒付", sub:"有機會申請爭議款處理（視規範）", icon:"🦢" },
       ]
     },
     {
@@ -397,10 +451,10 @@
       hint: "重點：付款是否已經真的從你手上扣走？",
       correctKey: "chargeback",
       opts: [
-        { key:"chargeback", label:"可申請爭議款/拒付", sub:"交易爭議時較常見有流程可申訴", icon:"🦢", kind:"credit"},
-        { key:"instantDeduct", label:"付款即時扣餘額", sub:"一刷就直接扣掉你卡內/錢包金額", icon:"🐦", kind:"prepaid"},
-        { key:"topUp", label:"先儲值再用", sub:"要先把錢放進去，才能交易", icon:"🦜", kind:"prepaid"},
-        { key:"quota", label:"受信用額度限制", sub:"可用額度內先消費", icon:"🦅", kind:"credit"},
+        { key:"chargeback", label:"可申請爭議款/拒付", sub:"交易爭議時較常見有流程可申訴", icon:"🦢" },
+        { key:"instantDeduct", label:"付款即時扣餘額", sub:"一刷就直接扣掉你卡內/錢包金額", icon:"🐦" },
+        { key:"topUp", label:"先儲值再用", sub:"要先把錢放進去，才能交易", icon:"🦜" },
+        { key:"quota", label:"受信用額度限制", sub:"可用額度內先消費", icon:"🦅" },
       ]
     },
     {
@@ -411,10 +465,10 @@
       hint: "看得到『當下』的支出後果，才好控管。",
       correctKey: "instantDeduct",
       opts: [
-        { key:"instantDeduct", label:"交易即時扣餘額", sub:"每刷一次，餘額立刻變少", icon:"🐤", kind:"prepaid"},
-        { key:"statement", label:"月底帳單結算", sub:"集中到帳單日才結算付款", icon:"🕊️", kind:"credit"},
-        { key:"interest", label:"未繳清可能有利息", sub:"可能產生循環利息", icon:"🦉", kind:"credit"},
-        { key:"quota", label:"有信用額度", sub:"可超過存款但受額度限制", icon:"🦅", kind:"credit"},
+        { key:"instantDeduct", label:"交易即時扣餘額", sub:"每刷一次，餘額立刻變少", icon:"🐤" },
+        { key:"statement", label:"月底帳單結算", sub:"集中到帳單日才結算付款", icon:"🕊️" },
+        { key:"interest", label:"未繳清可能有利息", sub:"可能產生循環利息", icon:"🦉" },
+        { key:"quota", label:"有信用額度", sub:"可超過存款但受額度限制", icon:"🦅" },
       ]
     },
     {
@@ -425,31 +479,46 @@
       hint: "重點：先把錢放進去 → 才能刷。",
       correctKey: "topUp",
       opts: [
-        { key:"topUp", label:"先儲值再使用", sub:"先加值到卡/錢包，交易時直接扣餘額", icon:"🦜", kind:"prepaid"},
-        { key:"payLater", label:"先消費後付款", sub:"月底或下月才付款", icon:"🕊️", kind:"credit"},
-        { key:"quota", label:"信用額度", sub:"可用額度內先消費", icon:"🦅", kind:"credit"},
-        { key:"chargeback", label:"爭議款申訴流程", sub:"遇到爭議交易可依規範申訴", icon:"🦢", kind:"credit"},
+        { key:"topUp", label:"先儲值再使用", sub:"先加值到卡/錢包，交易時直接扣餘額", icon:"🦜" },
+        { key:"payLater", label:"先消費後付款", sub:"月底或下月才付款", icon:"🕊️" },
+        { key:"quota", label:"信用額度", sub:"可用額度內先消費", icon:"🦅" },
+        { key:"chargeback", label:"爭議款申訴流程", sub:"遇到爭議交易可依規範申訴", icon:"🦢" },
       ]
     }
   ];
 
-  // ===== 遊戲狀態 =====
-  let idx = 0;
-  let score = 0;
-  let streak = 0;
-  let running = false;
-  let locked = false;
+  // ===== 狀態 =====
+  let idx = 0, score = 0, streak = 0;
+  let running = false, locked = false;
 
-  // 鳥列表（用於準星命中判定）
-  let birds = []; // {el,x,y,w,h,vx,vy,isCorrect,optKey}
+  // 鳥（命中判定用）
+  let birds = []; // {el,x,y,w,h,vx,vy,isCorrect}
+  let rafId = 0, lastT = 0;
 
-  // 動畫
-  let rafId = 0;
-  let lastT = 0;
+  // ===== 瞄準模式 =====
+  // aim.x/aim.y 是「射擊瞄準點」(game 內座標)
+  let aim = { x: 0, y: 0 };
+  let aimMode = "none"; // "gyro" | "center"
+  let gyroOn = false;
+  let neutral = null; // 校正中心
+  let lastOri = null; // 方向資料備用（Android 某些會先給 null）
 
-  // ===== 工具 =====
   const rand = (a,b)=> a + Math.random()*(b-a);
   const clamp = (v,a,b)=> Math.max(a, Math.min(b,v));
+
+  function centerAim(){
+    const W = game.clientWidth;
+    const H = game.clientHeight;
+    aim.x = W/2;
+    aim.y = H/2;
+    reticle.style.left = aim.x + "px";
+    reticle.style.top  = aim.y + "px";
+  }
+
+  function setAimMode(mode){
+    aimMode = mode;
+    chipAim.textContent = `瞄準：${mode==="gyro" ? "陀螺儀" : mode==="center" ? "中央準星" : "未選擇"}`;
+  }
 
   function setHUD(){
     statScore.textContent = `分數：${score}`;
@@ -460,7 +529,7 @@
   function flash(text, ok){
     flashMsg.textContent = text;
     flashMsg.className = ok ? "ok" : "no";
-    setTimeout(()=>{ flashMsg.textContent=" "; flashMsg.className=""; }, 900);
+    setTimeout(()=>{ flashMsg.textContent=" "; flashMsg.className=""; }, 950);
   }
 
   function shotFX(x,y){
@@ -471,19 +540,17 @@
     game.appendChild(fx);
     game.classList.add('shake');
     setTimeout(()=>game.classList.remove('shake'), 220);
-    setTimeout(()=>fx.remove(), 240);
+    setTimeout(()=>fx.remove(), 260);
   }
 
-  // 取速度倍率（預設慢）
   function speedMul(){
     const base = parseFloat(speedEl.value || "0.75");
-    // 難度對速度加成（仍保留滑桿主控）
     const d = diffEl.value;
     const k = d==="easy" ? 0.95 : d==="mid" ? 1.05 : 1.18;
     return base * k;
   }
 
-  // ===== 題目呈現（先讀 5 秒） =====
+  // ===== 讀題倒數 =====
   async function showCountdown(q){
     centerCard.style.display = '';
     centerQ.textContent = q.stem;
@@ -494,10 +561,13 @@
     chipFocus.textContent = `焦點：${q.focus}`;
     chipKey.textContent = `關鍵：${q.key}`;
     chipTrap.textContent = `常見誤區：${q.trap}`;
-    hintText.textContent = `看準星，點一下射擊。找出「最符合題意的特性」。`;
+    hintText.textContent = aimMode==="gyro"
+      ? "陀螺儀：轉動手機移動準星，點一下射擊。"
+      : "中央準星：準星固定中間，點一下射擊。";
 
     const total = 5.0;
     const start = performance.now();
+
     return new Promise(resolve=>{
       function tick(t){
         const s = (t - start)/1000;
@@ -525,8 +595,6 @@
   function makeBird(opt, isCorrect){
     const el = document.createElement('div');
     el.className = 'bird ' + (isCorrect ? 'good' : 'bad');
-
-    // 大小更清楚（選項更大）
     el.innerHTML = `
       <div class="ico">${opt.icon || "🐦"}</div>
       <div class="txt">
@@ -535,34 +603,34 @@
       </div>
     `;
 
-    // 初始位置與速度：會一直飛＋反彈（不會停在定點）
     const W = game.clientWidth;
     const H = game.clientHeight;
+    const w = 220, h = 74;
 
-    const w = 220;
-    const h = 74;
-
-    // 從四周進場（比較像「飛來」）
     const side = Math.floor(rand(0,4));
     let x, y;
-    if(side===0){ x = -w-10; y = rand(40, H-120); }          // 左
-    else if(side===1){ x = W+10; y = rand(40, H-120); }      // 右
-    else if(side===2){ x = rand(40, W-260); y = -h-10; }     // 上
-    else { x = rand(40, W-260); y = H+10; }                  // 下
+    if(side===0){ x = -w-10; y = rand(40, H-120); }
+    else if(side===1){ x = W+10; y = rand(40, H-120); }
+    else if(side===2){ x = rand(40, W-260); y = -h-10; }
+    else { x = rand(40, W-260); y = H+10; }
 
-    // 速度（隨機但受 speedMul 控制）
     const sp = speedMul();
-    const vx = (side===0 ? rand(90,150) : side===1 ? -rand(90,150) : rand(-140,140)) * sp;
-    const vy = (side===2 ? rand(90,140) : side===3 ? -rand(90,140) : rand(-120,120)) * sp;
+    let vx = (side===0 ? rand(90,150) : side===1 ? -rand(90,150) : rand(-140,140)) * sp;
+    let vy = (side===2 ? rand(90,140) : side===3 ? -rand(90,140) : rand(-120,120)) * sp;
 
     el.style.left = x + "px";
     el.style.top  = y + "px";
     game.appendChild(el);
 
-    const b = { el, x, y, w, h, vx, vy, isCorrect, optKey: opt.key };
+    const b = { el, x, y, w, h, vx, vy, isCorrect };
     birds.push(b);
-    // 不依賴點鳥，但保留可點（桌機也好用）
-    el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); if(!locked && running) onShoot(b); });
+
+    // 仍保留可點（桌機備用）
+    el.addEventListener('pointerdown', (ev)=>{
+      ev.preventDefault();
+      if(!locked && running) onShoot(b);
+    });
+
     return b;
   }
 
@@ -571,24 +639,16 @@
     locked = false;
     running = true;
 
-    // 選項數量：一般 4；進階 5；挑戰 6（讓你覺得不是兩個選項那麼單調）
     const d = diffEl.value;
     const targetCount = d==="easy" ? 4 : d==="mid" ? 5 : 6;
 
-    // 先把這題的 opts 打散
     const pool = q.opts.slice().sort(()=>Math.random()-0.5);
-
-    // 找出正確選項，確保一定出現
     const correct = pool.find(o=>o.key===q.correctKey) || q.opts.find(o=>o.key===q.correctKey);
     const rest = pool.filter(o=>o.key!==q.correctKey);
 
-    // 組合：1 正確 + (targetCount-1) 干擾
     const chosen = [correct, ...rest.slice(0, Math.max(0, targetCount-1))].sort(()=>Math.random()-0.5);
-
-    // 產生鳥
     chosen.forEach(opt=>{
-      const isCorrect = opt.key === q.correctKey;
-      makeBird(opt, isCorrect);
+      makeBird(opt, opt.key === q.correctKey);
     });
   }
 
@@ -598,6 +658,9 @@
     locked = true;
 
     const ok = b.isCorrect;
+    const q = BANK[idx-1];
+    const correct = q.opts.find(o=>o.key===q.correctKey);
+
     if(ok){
       score += 10;
       streak += 1;
@@ -605,18 +668,14 @@
     }else{
       score = Math.max(0, score - 5);
       streak = 0;
-      // 告訴正確是什麼（但不要一大段廢話）
-      const q = BANK[idx-1];
-      const correct = q.opts.find(o=>o.key===q.correctKey);
       flash(`❌ 打錯！正確：${correct.label}`, false);
     }
     setHUD();
 
-    // 0.9 秒後自動進下一題（你也可按按鈕）
-    setTimeout(()=> next(), 900);
+    setTimeout(()=> next(), 950);
   }
 
-  // ===== 主迴圈：一直飛＋反彈 =====
+  // ===== 飛行迴圈：一直飛，不會停 =====
   function loop(t){
     rafId = requestAnimationFrame(loop);
     if(!lastT) lastT = t;
@@ -630,23 +689,20 @@
     const sp = speedMul();
 
     for(const b of birds){
-      // 速度跟滑桿同步（即時調）
-      const k = sp / (sp || 1);
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      // 反彈邊界（留點內距，避免太貼邊）
-      const pad = 18;
+      // 走出邊界就從對面進場（不會停在定點）
       if(b.x < -b.w - 30) b.x = W + 10;
       if(b.x > W + 30)    b.x = -b.w - 10;
       if(b.y < -b.h - 30) b.y = H + 10;
       if(b.y > H + 30)    b.y = -b.h - 10;
 
-      // 小幅度擾動（看起來更像飛行，不是直線木頭）
-      b.vx += rand(-18,18) * dt * (diffEl.value==="hard" ? 1.2 : 0.9);
-      b.vy += rand(-18,18) * dt * (diffEl.value==="hard" ? 1.2 : 0.9);
+      // 擾動：更像飛行
+      const jitter = (diffEl.value==="hard" ? 1.2 : diffEl.value==="mid" ? 1.0 : 0.85);
+      b.vx += rand(-18,18) * dt * jitter;
+      b.vy += rand(-18,18) * dt * jitter;
 
-      // 限速避免太誇張
       const maxV = (diffEl.value==="easy" ? 220 : diffEl.value==="mid" ? 260 : 300) * parseFloat(speedEl.value);
       b.vx = clamp(b.vx, -maxV, maxV);
       b.vy = clamp(b.vy, -maxV, maxV);
@@ -656,19 +712,17 @@
     }
   }
 
-  // ===== VR 瞄準＋點擊射擊：永遠射正中央 =====
-  game.addEventListener("pointerdown", (e)=>{
-    const rect = game.getBoundingClientRect();
+  // ===== 射擊：用 aim.x/aim.y（陀螺儀/中央） =====
+  game.addEventListener("pointerdown", ()=>{
+    if(aimMode==="none") return;
 
-    // 用頭瞄準：準星固定正中央
-    const x = rect.width / 2;
-    const y = rect.height / 2;
+    const x = aim.x || game.clientWidth/2;
+    const y = aim.y || game.clientHeight/2;
 
     shotFX(x,y);
 
     if(locked || !running) return;
 
-    // 命中判定：準星中心落在哪隻鳥框內
     for(let i = birds.length - 1; i >= 0; i--){
       const b = birds[i];
       if(x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h){
@@ -678,14 +732,107 @@
     }
   });
 
+  // ===== 陀螺儀瞄準（可選） =====
+  function onDeviceOrientation(e){
+    if(!gyroOn) return;
+
+    // beta: 前後傾  (-180~180), gamma: 左右傾 (-90~90)
+    const beta  = (e.beta  ?? 0);
+    const gamma = (e.gamma ?? 0);
+
+    lastOri = { beta, gamma };
+
+    if(!neutral){
+      neutral = { beta, gamma };
+    }
+
+    const db = beta  - neutral.beta;   // 上下
+    const dg = gamma - neutral.gamma;  // 左右
+
+    // 靈敏度：你可調（8~14）
+    const sensitivity = 10;
+
+    const W = game.clientWidth;
+    const H = game.clientHeight;
+
+    // 映射到畫面座標
+    aim.x = clamp(W/2 + dg * sensitivity, 14, W-14);
+    aim.y = clamp(H/2 + db * sensitivity, 14, H-14);
+
+    reticle.style.left = aim.x + "px";
+    reticle.style.top  = aim.y + "px";
+  }
+
+  async function enableGyro(){
+    // iOS 13+ 需要使用者手勢觸發授權
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if(r !== "granted") throw new Error("未授權陀螺儀");
+    }
+    gyroOn = true;
+    neutral = null;
+    window.addEventListener("deviceorientation", onDeviceOrientation, true);
+
+    // 先把準星置中
+    centerAim();
+  }
+
+  function selectModeCenter(){
+    setAimMode("center");
+    gyroOn = false;
+    neutral = null;
+    // 不移除 listener 也沒關係，因為 gyroOn=false 不會動
+    centerAim();
+    modePanel.style.display = "none";
+    hintText.textContent = "中央準星：準星固定中間，點一下射擊。";
+    qMain.textContent = "已選中央準星。按「開始 / 下一題」開始。";
+  }
+
+  async function selectModeGyro(){
+    setAimMode("gyro");
+    try{
+      await enableGyro();
+      modePanel.style.display = "none";
+      hintText.textContent = "陀螺儀：轉動手機移動準星，點一下射擊。";
+      qMain.textContent = "已選陀螺儀瞄準。按「開始 / 下一題」開始。";
+    }catch(err){
+      // 授權失敗：自動切回中央模式，避免卡死
+      flash("⚠️ 陀螺儀啟用失敗，已改用中央準星", false);
+      selectModeCenter();
+    }
+  }
+
+  // 重新校正：把目前角度當成中心（或直接置中）
+  function recenter(){
+    if(aimMode==="gyro"){
+      // 重新以當前角度作為中心
+      if(lastOri){
+        neutral = { beta: lastOri.beta, gamma: lastOri.gamma };
+      }else{
+        neutral = null;
+      }
+      flash("🎯 已重新校正（以現在姿勢為中心）", true);
+    }else if(aimMode==="center"){
+      centerAim();
+      flash("🎯 已置中準星", true);
+    }
+  }
+
+  btnModeCenter.addEventListener("click", selectModeCenter);
+  btnModeGyro.addEventListener("click", selectModeGyro);
+  btnRecenter.addEventListener("click", recenter);
+
   // ===== 控制：開始/下一題、重來 =====
   async function next(){
+    if(aimMode==="none") return;
+
     running = false;
     clearBirds();
 
     if(idx >= BANK.length){
-      qMain.textContent = `結束！你的分數：${score}（連對最高可繼續刷題）`;
-      qMini.textContent = `可按「重來」再練一次。`;
+      qMain.textContent = `結束！你的分數：${score}`;
+      qMini.textContent = `可按「重來」或再練一次。`;
       centerCard.style.display = 'none';
       hintText.textContent = "完成。";
       return;
@@ -704,16 +851,32 @@
     locked = false; running = false;
     clearBirds();
     setHUD();
-    qMain.textContent = "按「開始 / 下一題」開始。先讀題 5 秒，再開始打鳥。";
-    qMini.textContent = "玩法：用頭瞄準（看準星），點一下射擊。打中「符合題意的特性」那隻鳥。";
+
     chipFocus.textContent = "焦點：—";
     chipKey.textContent = "關鍵：—";
     chipTrap.textContent = "常見誤區：—";
-    hintText.textContent = "—";
+
+    if(aimMode==="none"){
+      qMain.textContent = "先選擇瞄準方式（陀螺儀/中央準星）。";
+      qMini.textContent = "玩法：點一下射擊。陀螺儀模式可用「轉動手機」移動準星。";
+      hintText.textContent = "—";
+      modePanel.style.display = "";
+    }else{
+      qMain.textContent = "按「開始 / 下一題」開始。先讀題 5 秒，再開始打鳥。";
+      qMini.textContent = aimMode==="gyro"
+        ? "玩法：轉動手機移動準星，點一下射擊。"
+        : "玩法：準星固定中間，點一下射擊。";
+      hintText.textContent = aimMode==="gyro"
+        ? "陀螺儀：轉動手機移動準星，點一下射擊。"
+        : "中央準星：準星固定中間，點一下射擊。";
+    }
+
     centerCard.style.display = 'none';
+    centerAim();
   }
 
   btnStart.addEventListener('click', ()=>{
+    if(aimMode==="none") return;
     if(!rafId) rafId = requestAnimationFrame(loop);
     next();
   });
@@ -724,7 +887,13 @@
 
   // 初始化
   setHUD();
+  setAimMode("none");
+  centerAim();
   reset();
+
+  window.addEventListener("resize", ()=>{
+    centerAim();
+  });
 })();
 </script>
 </body>
