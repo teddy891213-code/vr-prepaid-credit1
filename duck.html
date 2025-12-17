@@ -2,232 +2,767 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>打鴨子學金融：儲值卡 vs 信用卡</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>2D 打鳥素養：儲值卡 vs 信用卡（V2）</title>
   <style>
-    html, body { margin:0; height:100%; background:#0b0f1a; color:#fff; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
-    #wrap { display:flex; flex-direction:column; height:100%; }
-    #topbar {
-      padding: 10px 12px;
-      background: rgba(0,0,0,.45);
-      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
-      border-bottom: 1px solid rgba(255,255,255,.08);
+    :root{
+      --bg:#061018;
+      --panel: rgba(0,0,0,.55);
+      --panel2: rgba(255,255,255,.06);
+      --line: rgba(255,255,255,.14);
+      --txt:#eaf2ff;
+      --muted:#b7c3da;
+      --good:#4bf08a;
+      --bad:#ff6b6b;
+      --warn:#ffd36a;
+      --accent:#7bd6ff;
+      --accent2:#b39cff;
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
     }
-    .pill { border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:2px 10px; font-size:12px; opacity:.95; }
-    #question { font-weight:700; }
-    #sub { opacity:.9; font-size:13px; margin-top:4px; }
-    #panel { padding:10px 12px; background: rgba(0,0,0,.35); border-top: 1px solid rgba(255,255,255,.08); }
-    button {
-      appearance:none; border:1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.06);
-      color:#fff; padding:10px 12px; border-radius:12px; font-weight:700;
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Noto Sans TC","Segoe UI",Roboto,Arial;}
+    #wrap{height:100%;display:grid;grid-template-rows:auto 1fr auto;}
+    header{
+      padding:10px 14px;
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+      border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
     }
-    button:active { transform: scale(.99); }
-    #canvas { width:100%; flex:1; display:block; touch-action: manipulation; }
-    .hint { opacity:.9; font-size:13px; line-height:1.35; }
-    .warn { color:#ffd66b; }
+    header .title{font-weight:900}
+    header .title span{color:var(--accent)}
+    header .pill{
+      padding:4px 10px;border-radius:999px;
+      border:1px solid var(--line); background:var(--panel2);
+      font-size:12px;color:var(--muted); white-space:nowrap;
+    }
+    header .spacer{flex:1}
+    label.ctrl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+    input[type="range"]{width:170px}
+    select,button{
+      background:var(--panel2);
+      border:1px solid var(--line);
+      color:var(--txt);
+      padding:7px 10px;
+      border-radius:10px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    button.primary{border-color:rgba(255,211,106,.6); box-shadow:0 0 0 2px rgba(255,211,106,.12) inset}
+    button:active{transform:translateY(1px)}
+
+    main#game{
+      position:relative; overflow:hidden;
+      cursor:crosshair;
+      background:
+        radial-gradient(900px 500px at 22% 20%, rgba(123,214,255,.14), transparent 58%),
+        radial-gradient(900px 600px at 78% 18%, rgba(179,156,255,.12), transparent 60%),
+        radial-gradient(900px 700px at 50% 90%, rgba(255,211,106,.08), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.0));
+      user-select:none;
+    }
+
+    /* 左上提示 */
+    #hudHint{
+      position:absolute; left:12px; top:12px;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px 12px;
+      max-width:min(560px, calc(100% - 24px));
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(6px);
+    }
+    #hudHint .q{font-size:14px; font-weight:900; line-height:1.35}
+    #hudHint .meta{margin-top:6px; display:flex; gap:8px; flex-wrap:wrap}
+    .tag{
+      font-size:12px;color:var(--muted);
+      border:1px solid var(--line);
+      background:var(--panel2);
+      padding:3px 8px;border-radius:999px;
+    }
+
+    /* 中央題目卡 */
+    #centerCard{
+      position:absolute; inset:0;
+      display:none; align-items:center; justify-content:center;
+      pointer-events:none;
+    }
+    #centerCard .card{
+      width:min(860px, calc(100% - 28px));
+      background:rgba(0,0,0,.68);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:20px;
+      padding:16px 18px 14px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+    #centerCard .head{
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    #centerCard .head .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.16);
+      color:var(--muted);font-size:12px;font-weight:800;
+    }
+    #centerCard .title{
+      font-size:20px;font-weight:950;line-height:1.35;
+    }
+    #centerCard .sub{
+      margin-top:10px;
+      display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;
+      color:var(--muted);font-size:12px;
+    }
+    .bar{
+      height:10px; flex:1; min-width:220px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:999px;
+      overflow:hidden;
+    }
+    .bar > i{
+      display:block; height:100%; width:0%;
+      background:linear-gradient(90deg, rgba(123,214,255,.95), rgba(179,156,255,.95));
+    }
+
+    /* 鳥（選項）— V2 放大、字放大 */
+    .bird{
+      position:absolute;
+      left:0; top:0;
+      transform:translate(-9999px,-9999px);
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.20);
+      background:rgba(0,0,0,.38);
+      box-shadow:0 12px 34px rgba(0,0,0,.28);
+      display:flex;align-items:center;gap:12px;
+      padding:10px 12px;
+      backdrop-filter: blur(4px);
+    }
+    .bird:hover{border-color:rgba(255,211,106,.55)}
+    .icon{
+      width:52px;height:52px;border-radius:16px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.14);
+      display:grid;place-items:center;
+      flex:0 0 auto;
+    }
+    .labelWrap{min-width:0}
+    .label{
+      font-weight:950; font-size:18px; line-height:1.05;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      letter-spacing:.2px;
+    }
+    .chips{margin-top:6px; display:flex; gap:7px; flex-wrap:wrap}
+    .chip{
+      font-size:12px; padding:3px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      color:var(--muted);
+      background:rgba(255,255,255,.04);
+      white-space:nowrap;
+    }
+
+    /* 回饋訊息 */
+    #toast{
+      position:absolute; left:50%; bottom:14px;
+      transform:translateX(-50%);
+      width:min(920px, calc(100% - 24px));
+      background:rgba(0,0,0,.66);
+      border:1px solid rgba(255,255,255,.16);
+      border-radius:16px;
+      padding:10px 12px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(10px);
+      display:none;
+      font-size:14px;
+      line-height:1.35;
+    }
+    #toast b{font-weight:950}
+    #toast .ok{color:var(--good)}
+    #toast .no{color:var(--bad)}
+
+    /* 射擊特效：準星波紋 + 閃光 */
+    .shot{
+      position:absolute;
+      width:18px;height:18px;border-radius:999px;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      border:2px solid rgba(255,255,255,.85);
+      box-shadow:0 0 0 6px rgba(123,214,255,.18), 0 0 28px rgba(123,214,255,.22);
+      animation: shotPop .28s ease-out forwards;
+    }
+    .flash{
+      position:absolute;
+      width:120px;height:120px;border-radius:999px;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      background:radial-gradient(circle, rgba(255,211,106,.35), transparent 60%);
+      animation: flash .22s ease-out forwards;
+      mix-blend-mode:screen;
+    }
+    @keyframes shotPop{
+      from{opacity:1; transform:translate(-50%,-50%) scale(.85)}
+      to{opacity:0; transform:translate(-50%,-50%) scale(1.8)}
+    }
+    @keyframes flash{
+      from{opacity:.9; transform:translate(-50%,-50%) scale(.5)}
+      to{opacity:0; transform:translate(-50%,-50%) scale(1.25)}
+    }
+    .spark{
+      position:absolute;
+      width:6px;height:6px;border-radius:2px;
+      transform:translate(-50%,-50%);
+      pointer-events:none;
+      background:rgba(255,255,255,.85);
+      box-shadow:0 0 18px rgba(255,211,106,.35);
+      animation: spark .36s ease-out forwards;
+    }
+    @keyframes spark{
+      from{opacity:1; transform:translate(-50%,-50%) translate(0,0) rotate(0deg)}
+      to{opacity:0; transform:translate(-50%,-50%) translate(var(--dx), var(--dy)) rotate(120deg)}
+    }
+
+    #footer{
+      padding:10px 14px;
+      border-top:1px solid var(--line);
+      color:var(--muted);
+      font-size:12px;
+      display:flex;gap:10px;flex-wrap:wrap;
+      background:linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+    }
+    #footer .hint{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    kbd{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas;
+      font-size:11px;
+      padding:2px 6px;border-radius:6px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--txt);
+    }
   </style>
 </head>
 <body>
 <div id="wrap">
-  <div id="topbar">
-    <div class="pill">分數：<span id="score">0</span></div>
-    <div class="pill">生命：<span id="hp">3</span></div>
-    <div class="pill">連對：<span id="streak">0</span></div>
-    <div class="pill">倒數：<span id="time">10</span>s</div>
-    <div style="flex:1; min-width:200px;">
-      <div id="question">按「開始」出題</div>
-      <div id="sub" class="hint">玩法：看題目 → 點擊/點觸正確鴨子。打錯會扣生命。</div>
+  <header>
+    <div class="title">2D 打鳥素養：<span>支付方式判讀</span></div>
+    <div class="pill" id="pScore">分數：0</div>
+    <div class="pill" id="pStreak">連對：0</div>
+    <div class="pill" id="pQ">題號：0/0</div>
+
+    <div class="spacer"></div>
+
+    <label class="ctrl">速度
+      <input id="speed" type="range" min="0.55" max="1.85" step="0.05" value="0.95" />
+    </label>
+
+    <label class="ctrl">目標大小
+      <input id="size" type="range" min="0.90" max="1.35" step="0.05" value="1.15" />
+    </label>
+
+    <label class="ctrl">難度
+      <select id="difficulty">
+        <option value="easy">簡單</option>
+        <option value="normal" selected>一般</option>
+        <option value="hard">困難</option>
+      </select>
+    </label>
+
+    <button class="primary" id="btnStart">開始 / 下一題</button>
+    <button id="btnReset">重來</button>
+  </header>
+
+  <main id="game" aria-label="game area">
+    <div id="hudHint">
+      <div class="q">規則：先看題目 5 秒 → 再打中「正確那隻鳥」</div>
+      <div class="meta">
+        <span class="tag">抓關鍵：先付 / 後付</span>
+        <span class="tag">抓關鍵：能不能超支</span>
+        <span class="tag">抓關鍵：月底帳單 or 立刻扣</span>
+      </div>
     </div>
-    <button id="btnStart">開始</button>
-    <button id="btnRestart" style="display:none;">重來</button>
-  </div>
 
-  <canvas id="canvas"></canvas>
+    <div id="centerCard">
+      <div class="card">
+        <div class="head">
+          <span class="badge">📌 先讀題（5 秒）</span>
+          <span class="badge" id="ccFocus">焦點：—</span>
+          <span class="badge" id="ccKey">關鍵：—</span>
+        </div>
+        <div class="title" id="ccText">—</div>
+        <div class="sub">
+          <span id="ccCountdown">準備開始：5</span>
+          <span class="bar" aria-hidden="true"><i id="ccBar"></i></span>
+          <span style="min-width:92px;text-align:right">出鳥倒數</span>
+        </div>
+      </div>
+    </div>
 
-  <div id="panel">
+    <div id="toast"></div>
+  </main>
+
+  <div id="footer">
     <div class="hint">
-      <span class="warn">教學核心：</span>
-      儲值卡＝先儲值（預付）→再消費（扣餘額）；
-      信用卡＝先消費→銀行先墊款→你之後繳款（延後給付）。
+      操作：<kbd>滑鼠點擊</kbd> 打鳥｜
+      看到舊畫面：網址加 <kbd>?v=2</kbd> 或 <kbd>Ctrl+F5</kbd>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  // ===== Canvas setup =====
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
-
-  function resize() {
-    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(rect.height * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  // ===== UI =====
-  const elScore = document.getElementById('score');
-  const elHp = document.getElementById('hp');
-  const elStreak = document.getElementById('streak');
-  const elTime = document.getElementById('time');
-  const elQ = document.getElementById('question');
-  const elSub = document.getElementById('sub');
-  const btnStart = document.getElementById('btnStart');
-  const btnRestart = document.getElementById('btnRestart');
-
-  // ===== Question bank (可擴充) =====
-  // 每題：prompt + options (2~4)；正確答案 index
-  const QUESTIONS = [
+  // ====== 題庫（人話版：短、清楚、素養）======
+  // 每題都在問：先付/後付、能否超支、月結/即扣
+  const BANK = [
     {
-      prompt: "哪個是「儲值卡」的正確流程？",
-      options: ["先儲值 → 再消費", "先消費 → 後繳款", "先消費 → 再儲值"],
-      correct: 0,
-      explain: "儲值卡是預付：先把錢存進去，消費時扣餘額。"
+      text: "你現在沒錢，但店家說：先把東西拿走，月底再一起繳。你用的是哪一種？",
+      focus: "付款時間",
+      key: "先用後付＝後付",
+      answer: "credit",
+      options: [
+        { id:"credit", label:"信用卡", chips:["先用後付","月底帳單"], why:"你先消費，之後（月底）才繳款。"},
+        { id:"prepaid", label:"儲值卡", chips:["先加值","扣餘額"], why:"儲值卡一定要先有餘額才扣。"},
+        { id:"debit", label:"簽帳/金融卡", chips:["立刻扣款","扣存款"], why:"簽帳卡是當下從銀行存款扣，不等月底。"},
+        { id:"cash", label:"現金", chips:["當下付清","不欠款"], why:"現金是立刻付清，沒有月底帳單。"}
+      ]
     },
     {
-      prompt: "哪個是「信用卡」的正確流程？",
-      options: ["先儲值 → 再消費", "先消費 → 後繳款", "先繳款 → 再消費"],
-      correct: 1,
-      explain: "信用卡是延後給付：先消費，之後收到帳單再付錢。"
+      text: "你刷卡後，錢立刻從銀行帳戶扣掉（不是月底帳單）。這是哪一種？",
+      focus: "扣款方式",
+      key: "立刻扣帳戶＝即扣",
+      answer: "debit",
+      options: [
+        { id:"debit", label:"簽帳/金融卡", chips:["即扣","扣存款"], why:"重點是「直接扣銀行帳戶」。"},
+        { id:"credit", label:"信用卡", chips:["後付","月底帳單"], why:"信用卡通常是月底結帳再繳。"},
+        { id:"prepaid", label:"儲值卡", chips:["扣餘額","先加值"], why:"儲值卡扣的是卡內餘額，不一定連到帳戶。"},
+        { id:"bnpl", label:"先買後付(BNPL)", chips:["分期","平台額度"], why:"BNPL多是平台分期，不是銀行即扣。"}
+      ]
     },
     {
-      prompt: "你刷信用卡買東西時，誰先把錢付給商店？",
-      options: ["你本人當下付", "銀行/發卡機構先墊款", "商店自己吸收"],
-      correct: 1,
-      explain: "信用卡交易中，銀行/發卡機構會先付給商店（你之後再繳款）。"
+      text: "你用交通卡搭車：要先加值，餘額不夠就刷不過。這是哪一種？",
+      focus: "能否先用後付",
+      key: "餘額不夠就不能用＝先付",
+      answer: "prepaid",
+      options: [
+        { id:"prepaid", label:"儲值卡", chips:["先加值","不足就不行"], why:"你只能花卡內餘額。"},
+        { id:"credit", label:"信用卡", chips:["用額度","之後再繳"], why:"信用卡不是看卡內餘額。"},
+        { id:"debit", label:"簽帳/金融卡", chips:["扣存款","即扣"], why:"簽帳卡是看帳戶餘額，不是加值餘額。"},
+        { id:"cash", label:"現金", chips:["當下付","找零"], why:"情境重點是「加值餘額」。"}
+      ]
     },
     {
-      prompt: "你用儲值卡付費時，扣的是哪裡的錢？",
-      options: ["卡內餘額", "銀行先墊的款", "月底帳單"],
-      correct: 0,
-      explain: "儲值卡消費會直接扣卡內餘額。"
+      text: "你刷卡買東西後拖著不繳，結果帳單利息越滾越多。最像哪一種？",
+      focus: "費用/風險",
+      key: "未繳清＋利息＝信用",
+      answer: "credit",
+      options: [
+        { id:"credit", label:"信用卡", chips:["可能利息","循環"], why:"沒全額繳清可能產生利息/循環。"},
+        { id:"prepaid", label:"儲值卡", chips:["先付","不超支"], why:"儲值卡不能透支，不會有循環利息。"},
+        { id:"debit", label:"簽帳/金融卡", chips:["即扣","扣存款"], why:"即扣不會出現「拖帳單利息」。"},
+        { id:"mobile", label:"行動錢包(餘額)", chips:["扣餘額","先付"], why:"多半是先付/扣餘額。"}
+      ]
     },
     {
-      prompt: "看到『月底帳單』這個關鍵字，最可能是哪一種？",
-      options: ["儲值卡", "信用卡", "兩者都一定有帳單"],
-      correct: 1,
-      explain: "月底帳單＝信用卡典型特徵（延後給付）。"
+      text: "家長說：你只能花『先存進去』的錢，不能借錢超支。最像哪一種？",
+      focus: "能否超支",
+      key: "不能超支＝先付",
+      answer: "prepaid",
+      options: [
+        { id:"prepaid", label:"儲值卡", chips:["先存錢","不能超支"], why:"餘額就是上限。"},
+        { id:"credit", label:"信用卡", chips:["有額度","先用後繳"], why:"信用卡是先用額度再繳。"},
+        { id:"bnpl", label:"先買後付(BNPL)", chips:["延後付","像小額信用"], why:"BNPL也是先用後付。"},
+        { id:"cash", label:"現金", chips:["當下付","不欠款"], why:"現金也不欠款，但題幹特別強調「先存進去」更像儲值。"}
+      ]
+    },
+    {
+      text: "你用手機付款：有時是綁信用卡（月底繳），有時是用錢包餘額（先儲值）。要怎麼判斷？",
+      focus: "判讀方法",
+      key: "看背後資金來源",
+      answer: "mixed",
+      options: [
+        { id:"mixed", label:"看它綁哪個來源", chips:["可能信用","可能儲值"], why:"行動支付只是工具，關鍵在背後是信用卡/餘額/帳戶。"},
+        { id:"credit", label:"一律算信用卡", chips:["都後付"], why:"錯：也可能扣餘額或扣帳戶。"},
+        { id:"prepaid", label:"一律算儲值卡", chips:["都先付"], why:"錯：也可能綁信用卡月結。"},
+        { id:"cash", label:"跟現金一樣", chips:["都當下"], why:"錯：來源不同規則就不同。"}
+      ]
     }
   ];
 
-  // ===== Game state =====
+  // ====== DOM ======
+  const $ = (id) => document.getElementById(id);
+  const game = $("game");
+  const btnStart = $("btnStart");
+  const btnReset = $("btnReset");
+  const speedCtl = $("speed");
+  const sizeCtl  = $("size");
+  const diffCtl  = $("difficulty");
+  const pScore = $("pScore");
+  const pStreak = $("pStreak");
+  const pQ = $("pQ");
+  const toast = $("toast");
+
+  const centerCard = $("centerCard");
+  const ccText = $("ccText");
+  const ccFocus = $("ccFocus");
+  const ccKey = $("ccKey");
+  const ccCountdown = $("ccCountdown");
+  const ccBar = $("ccBar");
+
+  // ====== 音效（不用外部檔）======
+  let audioCtx = null;
+  function beep(type="shot"){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+
+      const now = ctx.currentTime;
+      o.type = "square";
+
+      if(type==="shot"){ o.frequency.setValueAtTime(760, now); }
+      if(type==="hit"){  o.frequency.setValueAtTime(980, now); }
+      if(type==="miss"){ o.frequency.setValueAtTime(220, now); }
+
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.10, now+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now);
+      o.stop(now+0.14);
+    }catch(e){}
+  }
+
+  // ====== 狀態 ======
+  let score = 0, streak = 0, qIndex = -1;
+  let birds = [];
+  let raf = null;
   let running = false;
-  let score = 0, hp = 3, streak = 0;
-  let timeLeft = 10;
-  let timerId = null;
+  let locked = false;
 
-  let currentQ = null;
-  let ducks = []; // {x,y,w,h,vx,vy,label,isCorrect,hit}
+  const DIFF = {
+    easy:   { count: 4, agility: 0.52 },
+    normal: { count: 4, agility: 0.75 },
+    hard:   { count: 5, agility: 0.92 }
+  };
 
-  function setHud() {
-    elScore.textContent = String(score);
-    elHp.textContent = String(hp);
-    elStreak.textContent = String(streak);
-    elTime.textContent = String(timeLeft);
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function rnd(a,b){ return a + Math.random()*(b-a); }
+
+  function setHUD(){
+    pScore.textContent = `分數：${score}`;
+    pStreak.textContent = `連對：${streak}`;
+    pQ.textContent = `題號：${Math.max(0,qIndex+1)}/${BANK.length}`;
   }
 
-  function pickQuestion() {
-    // random question
-    currentQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-    elQ.textContent = currentQ.prompt;
-    elSub.textContent = "提示：點到正確鴨子得分；打錯扣生命。";
+  function showToast(ok, msg){
+    toast.style.display = "block";
+    toast.innerHTML = ok
+      ? `<b class="ok">✅ 打中！</b>　${msg}`
+      : `<b class="no">❌ 打錯！</b>　${msg}`;
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> toast.style.display="none", 1700);
   }
 
-  function spawnDucks() {
-    ducks = [];
-    const W = canvas.getBoundingClientRect().width;
-    const H = canvas.getBoundingClientRect().height;
+  // ====== 射擊特效（點哪裡都有）======
+  function shotFX(x,y){
+    const s = document.createElement("div");
+    s.className = "shot";
+    s.style.left = x+"px"; s.style.top = y+"px";
+    game.appendChild(s);
 
-    const opts = currentQ.options.map((text, i) => ({
-      text, isCorrect: i === currentQ.correct
-    }));
+    const f = document.createElement("div");
+    f.className = "flash";
+    f.style.left = x+"px"; f.style.top = y+"px";
+    game.appendChild(f);
 
-    // 2~4 隻同時出現：用全部 options
-    const count = opts.length;
+    // sparks
+    for(let i=0;i<6;i++){
+      const p = document.createElement("div");
+      p.className = "spark";
+      p.style.left = x+"px"; p.style.top = y+"px";
+      p.style.setProperty("--dx", `${rnd(-60,60).toFixed(0)}px`);
+      p.style.setProperty("--dy", `${rnd(-50,50).toFixed(0)}px`);
+      game.appendChild(p);
+      setTimeout(()=>p.remove(), 420);
+    }
 
-    for (let i = 0; i < count; i++) {
-      const w = 180, h = 70;
-      const x = -w - Math.random() * 120;              // 從左外面飛入
-      const y = 80 + i * (Math.min(110, (H-160)/(count))) + (Math.random()*20-10);
-      const speed = 80 + Math.random()*60;             // px/s
-      ducks.push({
-        x, y, w, h,
-        vx: speed,
-        vy: (Math.random()*20 - 10),
-        label: opts[i].text,
-        isCorrect: opts[i].isCorrect,
-        hit: false
+    setTimeout(()=>s.remove(), 320);
+    setTimeout(()=>f.remove(), 260);
+  }
+
+  // 點背景也會有射擊感（但不算答題）
+  game.addEventListener("pointerdown", (e)=>{
+    const rect = game.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    shotFX(x,y);
+    beep("shot");
+  });
+
+  // ====== 鳥圖示（SVG）======
+  function birdIconHTML(kind){
+    const color = {
+      credit:"#ffd36a", prepaid:"#7bd6ff", debit:"#4bf08a",
+      cash:"#b39cff", bnpl:"#ff6b6b", mobile:"#7bd6ff", mixed:"#ffd36a"
+    }[kind] || "#b7c3da";
+
+    return `
+      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+        <path fill="${color}" d="M41 12c-7 2-11 7-12 14-8-5-18-1-20 8-3 10 8 20 22 17 9-2 17-11 16-22-1-6-3-11-6-17z"/>
+        <circle fill="rgba(0,0,0,.6)" cx="40" cy="26" r="3"/>
+        <path fill="rgba(0,0,0,.35)" d="M47 30c7 2 11 5 11 8-8 2-14 0-18-4 2-3 4-4 7-4z"/>
+      </svg>`;
+  }
+
+  function clearBirds(){
+    for(const b of birds) b.el.remove();
+    birds = [];
+  }
+
+  function makeBird(opt, answerId){
+    const el = document.createElement("div");
+    el.className = "bird";
+    el.dataset.id = opt.id;
+
+    const chipA = opt.chips?.[0] || "";
+    const chipB = opt.chips?.[1] || "";
+
+    el.innerHTML = `
+      <div class="icon">${birdIconHTML(opt.id)}</div>
+      <div class="labelWrap">
+        <div class="label">${opt.label}</div>
+        <div class="chips">
+          ${chipA ? `<span class="chip">${chipA}</span>`:""}
+          ${chipB ? `<span class="chip">${chipB}</span>`:""}
+        </div>
+      </div>
+    `;
+
+    game.appendChild(el);
+
+    // V2：加大點擊判定（padding + 最小尺寸）
+    const baseW = 280;
+    const baseH = 78;
+    const scale = parseFloat(sizeCtl.value);
+    const w = baseW * scale;
+    const h = baseH * scale;
+    el.style.width = w + "px";
+    el.style.height = h + "px";
+
+    const rect = game.getBoundingClientRect();
+    const pad = 14;
+    let x = rnd(pad, rect.width - w - pad);
+    let y = rnd(100, rect.height - h - 56);
+
+    // 速度（慢一點但活）
+    let vx = rnd(-1.1, 1.1);
+    let vy = rnd(-0.9, 0.9);
+    if(Math.abs(vx) < 0.55) vx = vx < 0 ? -0.85 : 0.85;
+
+    const state = { el, opt, answerId, x, y, vx, vy, w, h };
+
+    el.addEventListener("click", (e)=>{
+      e.preventDefault();
+      e.stopPropagation(); // 不要同時被背景 click 算兩次
+      if(locked || !running) return;
+
+      // 讓點到鳥也在鳥中心炸一下，手感更爽
+      const r = game.getBoundingClientRect();
+      const cx = (state.x + state.w/2);
+      const cy = (state.y + state.h/2);
+      shotFX(cx,cy);
+
+      onShoot(state);
+    });
+
+    return state;
+  }
+
+  function onShoot(b){
+    locked = true;
+    const q = BANK[qIndex];
+    const correct = (b.opt.id === b.answerId);
+
+    if(correct){
+      beep("hit");
+      score += 12 + Math.min(8, streak*2);
+      streak += 1;
+      showToast(true, b.opt.why);
+    }else{
+      beep("miss");
+      score = Math.max(0, score - 8);
+      streak = 0;
+      const right = q.options.find(o=> o.id===q.answer);
+      showToast(false, `正解是 <b>${right.label}</b>：${right.why}`);
+    }
+    setHUD();
+
+    setTimeout(()=>{
+      locked = false;
+      nextQuestion();
+    }, 900);
+  }
+
+  function stopLoop(){
+    running = false;
+    if(raf) cancelAnimationFrame(raf);
+    raf = null;
+  }
+
+  function loop(){
+    if(!running) return;
+
+    const rect = game.getBoundingClientRect();
+    const pad = 12;
+    const speed = parseFloat(speedCtl.value);
+    const diff = DIFF[diffCtl.value];
+
+    for(const b of birds){
+      // 微隨機轉向，避免卡角落
+      const jitter = diff.agility * 0.07;
+      b.vx += rnd(-jitter, jitter);
+      b.vy += rnd(-jitter, jitter);
+
+      const maxV = 1.35 * speed * (0.85 + diff.agility*0.55);
+      b.vx = clamp(b.vx, -maxV, maxV);
+      b.vy = clamp(b.vy, -maxV, maxV);
+
+      b.x += b.vx * 2.1 * speed;
+      b.y += b.vy * 1.9 * speed;
+
+      // 彈牆
+      if(b.x <= pad){ b.x = pad; b.vx = Math.abs(b.vx) + 0.32; }
+      if(b.x + b.w >= rect.width - pad){ b.x = rect.width - pad - b.w; b.vx = -Math.abs(b.vx) - 0.32; }
+      if(b.y <= 80){ b.y = 80; b.vy = Math.abs(b.vy) + 0.25; }
+      if(b.y + b.h >= rect.height - 44){ b.y = rect.height - 44 - b.h; b.vy = -Math.abs(b.vy) - 0.25; }
+
+      b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
+    }
+
+    raf = requestAnimationFrame(loop);
+  }
+
+  async function showCenterQuestion(q){
+    centerCard.style.display = "flex";
+    ccText.textContent = q.text;
+    ccFocus.textContent = `焦點：${q.focus}`;
+    ccKey.textContent = `關鍵：${q.key}`;
+
+    let t = 5;
+    ccCountdown.textContent = `準備開始：${t}`;
+    ccBar.style.width = "0%";
+
+    for(let i=0;i<50;i++){
+      const pct = (i+1)/50;
+      ccBar.style.width = (pct*100).toFixed(0) + "%";
+      const nowT = Math.ceil(5 - pct*5);
+      if(nowT !== t){
+        t = nowT;
+        ccCountdown.textContent = `準備開始：${t}`;
+      }
+      await new Promise(r=>setTimeout(r, 100));
+    }
+
+    centerCard.style.display = "none";
+  }
+
+  function spawnForQuestion(q){
+    clearBirds();
+
+    const diff = DIFF[diffCtl.value];
+    let list = q.options.slice();
+
+    if(diff.count === 5){
+      const wrongs = list.filter(o=> o.id !== q.answer);
+      const pick = wrongs[Math.floor(Math.random()*wrongs.length)];
+      list.push({
+        id: pick.id,
+        label: pick.label + "（混）",
+        chips: ["看關鍵字","別被騙"],
+        why: pick.why
       });
     }
+
+    list.sort(()=>Math.random()-0.5);
+
+    birds = list.map(opt => makeBird(opt, q.answer));
+
+    running = true;
+    if(!raf) raf = requestAnimationFrame(loop);
   }
 
-  function startRound() {
-    timeLeft = 10;
-    pickQuestion();
-    spawnDucks();
-    setHud();
+  async function nextQuestion(){
+    stopLoop();
+    clearBirds();
 
-    clearInterval(timerId);
-    timerId = setInterval(() => {
-      if (!running) return;
-      timeLeft -= 1;
-      if (timeLeft <= 0) {
-        timeLeft = 0;
-        setHud();
-        // 沒打到正確也算失敗
-        onMissed();
-      } else {
-        setHud();
-      }
-    }, 1000);
-  }
-
-  function onCorrect() {
-    score += 10 + Math.min(10, streak * 2);
-    streak += 1;
-    elSub.textContent = "✅ 正確！" + currentQ.explain;
-    startRound();
-  }
-
-  function onWrong(msg) {
-    hp -= 1;
-    streak = 0;
-    elSub.textContent = "❌ 錯誤！" + (msg || currentQ.explain);
-    if (hp <= 0) {
-      endGame();
-    } else {
-      startRound();
+    qIndex += 1;
+    if(qIndex >= BANK.length){
+      centerCard.style.display = "flex";
+      ccText.textContent = "完成！按「開始 / 下一題」可再跑一次題庫。";
+      ccFocus.textContent = "焦點：總結";
+      ccKey.textContent = "先付/後付｜能否超支｜月底帳單/即扣";
+      ccCountdown.textContent = "—";
+      ccBar.style.width = "100%";
+      return;
     }
+
+    setHUD();
+    const q = BANK[qIndex];
+    await showCenterQuestion(q);
+    spawnForQuestion(q);
   }
 
-  function onMissed() {
-    hp -= 1;
-    streak = 0;
-    elSub.textContent = "⌛ 超時！" + currentQ.explain;
-    if (hp <= 0) endGame();
-    else startRound();
+  function resetAll(){
+    stopLoop();
+    clearBirds();
+    score = 0; streak = 0; qIndex = -1;
+    locked = false;
+    setHUD();
+    toast.style.display = "none";
+
+    centerCard.style.display = "flex";
+    ccText.textContent = "按「開始 / 下一題」開始。每題先讀 5 秒，再打中正確那隻鳥。";
+    ccFocus.textContent = "焦點：先付 / 後付";
+    ccKey.textContent = "關鍵：能否超支 / 月底帳單 / 即扣";
+    ccCountdown.textContent = "—";
+    ccBar.style.width = "0%";
   }
 
-  function endGame() {
-    running = false;
-    clearInterval(timerId);
-    elSub.textContent = `遊戲結束。你的分數：${score}。按「重來」再玩一次。`;
-    btnStart.style.display = "none";
-    btnRestart.style.display = "inline-block";
-  }
+  // 控制變動：即時重鋪（不等下一題）
+  sizeCtl.addEventListener("input", ()=>{
+    if(qIndex>=0 && qIndex < BANK.length){
+      stopLoop();
+      spawnForQuestion(BANK[qIndex]);
+    }
+  });
+  diffCtl.addEventListener("change", ()=>{
+    if(qIndex>=0 && qIndex < BANK.length){
+      stopLoop();
+      spawnForQuestion(BANK[qIndex]);
+    }
+  });
 
-  // ===== Render loop =====
-  let lastT = performance.now();
-  function loop(t) {
-    const dt = Math.min(0.05, (t - lastT) / 1000);
-    lastT = t;
+  btnStart.addEventListener("click", ()=>{
+    if(qIndex >= BANK.length-1 && !running && birds.length===0){
+      qIndex = -1;
+    }
+    nextQuestion();
+  });
+  btnReset.addEventListener("click", resetAll);
 
-    const W = canvas.getBoundingClientRect().width;
-    const H = canvas.getBoundingClientRect().height;
+  window.addEventListener("resize", ()=>{
+    if(qIndex>=0 && qIndex < BANK.length){
+      stopLoop();
+      spawnForQuestion(BANK[qIndex]);
+    }
+  });
 
-    // background
-    ctx.fillStyle
+  pQ.textContent = `題號：0/${BANK.length}`;
+  setHUD();
+  resetAll();
+})();
+</script>
+</body>
+</html>
