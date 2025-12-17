@@ -2,277 +2,388 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>VR 打鴨子：儲值卡 vs 信用卡</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>2D 打鴨子：儲值卡 vs 信用卡流程</title>
   <style>
-    html, body { margin:0; height:100%; background:#000; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
-    #hud{
-      position:fixed; left:0; right:0; bottom:0;
-      padding:10px 12px;
-      background: rgba(0,0,0,0.6);
-      color:#fff;
-      z-index: 9999;
-      line-height:1.35;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      font-size:14px;
+    html, body { height: 100%; margin: 0; background:#0b1020; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
+    #wrap { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+    header {
+      padding: 12px 14px; color: #fff;
+      display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
     }
-    #hud .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    #hud .pill{
-      border:1px solid rgba(255,255,255,0.25);
-      border-radius:999px;
-      padding:2px 10px;
-      font-size:12px;
-      opacity:.95;
+    header .pill{
+      padding: 4px 10px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      font-size: 12px; opacity: .95;
     }
-    #hud b{ font-weight:800; }
+    header b { font-weight: 800; }
+    #game {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(1200px 600px at 50% 120%, rgba(90,120,255,0.18), transparent 60%),
+        radial-gradient(900px 600px at 20% 0%, rgba(0,255,200,0.10), transparent 55%),
+        radial-gradient(900px 700px at 80% 10%, rgba(90,120,255,0.10), transparent 55%),
+        #0b1020;
+      touch-action: manipulation;
+      cursor: crosshair;
+    }
+    canvas { display:block; width:100%; height:100%; }
+    footer{
+      padding: 10px 14px; color:#cfd6ff; font-size: 13px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+      background: rgba(0,0,0,0.25);
+    }
+    button{
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.06);
+      color:#fff; padding: 8px 12px; border-radius: 10px;
+      cursor:pointer;
+    }
+    button:hover{ background: rgba(255,255,255,0.10); }
+    .hint { opacity:.95 }
+    .kbd{ padding: 2px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); font-size:12px; }
   </style>
 </head>
-
 <body>
-  <div id="hud">
-    <div class="row">
-      <div class="pill">操作：凝視 1 秒 或 點擊</div>
-      <div class="pill">分數：<span id="score">0</span></div>
-      <div class="pill">連對：<span id="streak">0</span></div>
+  <div id="wrap">
+    <header>
+      <div class="pill"><b id="qTitle">題目</b>：<span id="qText"></span></div>
+      <div class="pill">分數：<b id="score">0</b></div>
+      <div class="pill">連對：<b id="streak">0</b></div>
+      <div class="pill">回合：<b id="round">1</b> / <b id="roundMax">5</b></div>
+      <div class="pill">提示：點擊/觸控鴨子即可射擊</div>
+    </header>
+
+    <div id="game">
+      <canvas id="c"></canvas>
     </div>
-    <div style="margin-top:6px">
-      <b>題目：</b><span id="question">載入中…</span>
-    </div>
-    <div style="margin-top:4px; opacity:.9">
-      <b>提示：</b><span id="hint">打到寫著「正確流程」的鴨子。</span>
-    </div>
+
+    <footer>
+      <div class="hint" id="msg">按「開始」出第一波鴨子。</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <span class="kbd">手機：直接點</span>
+        <span class="kbd">電腦：滑鼠點</span>
+        <button id="startBtn">開始</button>
+        <button id="restartBtn">重來</button>
+      </div>
+    </footer>
   </div>
 
-  <a-scene background="color:#0b1020" vr-mode-ui="enabled:true" device-orientation-permission-ui="enabled:true">
-    <a-entity light="type:ambient; intensity:0.75"></a-entity>
-    <a-entity light="type:directional; intensity:0.9" position="1 3 2"></a-entity>
+<script>
+(() => {
+  // ====== Canvas setup ======
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const gameEl = document.getElementById('game');
 
-    <a-plane rotation="-90 0 0" width="50" height="50" color="#141a2b"></a-plane>
-    <a-sky color="#070b14"></a-sky>
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(gameEl.clientWidth * dpr);
+    canvas.height = Math.floor(gameEl.clientHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
 
-    <!-- Camera + cursor (gaze fuse + click) -->
-    <a-entity id="rig" position="0 1.6 6">
-      <a-camera wasd-controls-enabled="false">
-        <a-cursor
-          id="cursor"
-          fuse="true"
-          fuseTimeout="1000"
-          raycaster="objects: .duck"
-        ></a-cursor>
-      </a-camera>
-    </a-entity>
+  // ====== UI refs ======
+  const qText = document.getElementById('qText');
+  const scoreEl = document.getElementById('score');
+  const streakEl = document.getElementById('streak');
+  const roundEl = document.getElementById('round');
+  const roundMaxEl = document.getElementById('roundMax');
+  const msgEl = document.getElementById('msg');
 
-    <!-- Simple stage frame -->
-    <a-box position="0 1.2 -8" width="18" height="6" depth="0.4" color="#0f1430" material="opacity:0.7"></a-box>
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
 
-    <!-- Ducks container -->
-    <a-entity id="duckField"></a-entity>
+  // ====== Content ======
+  const CHOICES = [
+    { key: 'prepaid', label: '儲值卡', flow: '先儲值 → 再消費', desc: '你先把錢存進卡，再扣卡內餘額' },
+    { key: 'credit',  label: '信用卡', flow: '先消費 → 後繳款', desc: '你先拿商品，之後收到帳單再付給銀行' }
+  ];
 
-    <!-- 3D tiny helper text (optional) -->
-    <a-text value="VR 打鴨子：儲值卡 vs 信用卡" position="0 3.6 -6.5" align="center" width="10" color="#ffffff"></a-text>
+  const QUESTIONS = [
+    { text: '哪一個是「儲值卡」的正確流程？', answerKey: 'prepaid' },
+    { text: '哪一個是「信用卡」的正確流程？', answerKey: 'credit' },
+    { text: '哪個是「先儲值再消費」？', answerKey: 'prepaid' },
+    { text: '哪個是「先消費後繳款」？', answerKey: 'credit' },
+    { text: '要強調「預付」的是哪一個？', answerKey: 'prepaid' },
+    { text: '要強調「延後付款」的是哪一個？', answerKey: 'credit' },
+  ];
 
-    <script>
-      // -----------------------------
-      // Game data (兩個選項)
-      // -----------------------------
-      const CHOICES = {
-        prepaid:  { label: "儲值卡",  flow: "先儲值 → 再消費", color: "#2b7a78" },
-        credit:   { label: "信用卡",  flow: "先消費 → 後繳款", color: "#3b5bdb" }
-      };
+  // ====== Game state ======
+  let running = false;
+  let ducks = [];
+  let score = 0;
+  let streak = 0;
 
-      const QUESTIONS = [
-        { ask: "哪一個是「儲值卡」的正確流程？", answerKey: "prepaid" },
-        { ask: "哪一個是「信用卡」的正確流程？", answerKey: "credit" },
-        { ask: "誰是「先儲值，再消費」？", answerKey: "prepaid" },
-        { ask: "誰是「先消費，月底再繳款」？", answerKey: "credit" },
-      ];
+  let round = 1;
+  const ROUND_MAX = 5;
+  roundMaxEl.textContent = String(ROUND_MAX);
 
-      // -----------------------------
-      // DOM refs
-      // -----------------------------
-      const scoreEl = document.getElementById("score");
-      const streakEl = document.getElementById("streak");
-      const questionEl = document.getElementById("question");
-      const hintEl = document.getElementById("hint");
+  let currentQ = null;
+  let remaining = 0;
+  const DUCKS_PER_ROUND = 8;
 
-      // -----------------------------
-      // State
-      // -----------------------------
-      let score = 0;
-      let streak = 0;
-      let qIndex = 0;
-      let locked = false; // prevent double hits
+  // ====== Duck object ======
+  function makeDuck(choiceKey) {
+    const w = 190, h = 70;
+    const margin = 20;
 
-      function setHUD() {
-        scoreEl.textContent = String(score);
-        streakEl.textContent = String(streak);
-      }
+    const x = Math.random() * (gameEl.clientWidth - w - margin*2) + margin;
+    const y = Math.random() * (gameEl.clientHeight * 0.55) + 60;
 
-      function pickQuestion() {
-        const q = QUESTIONS[qIndex % QUESTIONS.length];
-        questionEl.textContent = q.ask;
-        hintEl.textContent = "打到寫著「正確流程」的鴨子。";
-        return q;
-      }
+    const speed = (Math.random() * 1.3 + 0.9) * (Math.random() < 0.5 ? -1 : 1);
+    const bob = Math.random() * 0.8 + 0.4;
+    const color = choiceKey === 'prepaid' ? 'rgba(0, 230, 180, 0.92)' : 'rgba(80, 130, 255, 0.92)';
 
-      function vibrate(ms){
-        try { if (navigator.vibrate) navigator.vibrate(ms); } catch(_) {}
-      }
+    return {
+      choiceKey,
+      x, y, w, h,
+      vx: speed,
+      t: Math.random() * 10,
+      bob,
+      color,
+      alive: true,
+    };
+  }
 
-      // -----------------------------
-      // A-Frame helpers
-      // -----------------------------
-      const field = document.getElementById("duckField");
+  function pickQuestion() {
+    currentQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+    qText.textContent = currentQ.text;
+  }
 
-      function clearDucks() {
-        while (field.firstChild) field.removeChild(field.firstChild);
-      }
+  function setMsg(text) { msgEl.textContent = text; }
+  function updateHUD() {
+    scoreEl.textContent = String(score);
+    streakEl.textContent = String(streak);
+    roundEl.textContent = String(round);
+  }
 
-      function makeDuck(id, textTop, textBottom, color, x, y, z, speed, direction) {
-        // Duck body
-        const g = document.createElement("a-entity");
-        g.setAttribute("class", "duck");
-        g.setAttribute("id", id);
-        g.dataset.choice = id; // 'prepaid' / 'credit'
+  function spawnRound() {
+    pickQuestion();
+    ducks = [];
+    remaining = DUCKS_PER_ROUND;
 
-        // Simple “duck” look: box + beak
-        const body = document.createElement("a-box");
-        body.setAttribute("width", "1.2");
-        body.setAttribute("height", "0.7");
-        body.setAttribute("depth", "0.4");
-        body.setAttribute("color", color);
+    // 保證至少 1 隻正確 + 1 隻錯誤，其他亂數
+    const mustCorrect = makeDuck(currentQ.answerKey);
+    const mustWrong = makeDuck(currentQ.answerKey === 'prepaid' ? 'credit' : 'prepaid');
+    ducks.push(mustCorrect, mustWrong);
 
-        const beak = document.createElement("a-cone");
-        beak.setAttribute("radius-bottom", "0.12");
-        beak.setAttribute("radius-top", "0.01");
-        beak.setAttribute("height", "0.25");
-        beak.setAttribute("color", "#f4a261");
-        beak.setAttribute("position", "0.65 0 0");
-        beak.setAttribute("rotation", "0 0 -90");
+    while (ducks.length < DUCKS_PER_ROUND) {
+      const k = Math.random() < 0.5 ? 'prepaid' : 'credit';
+      ducks.push(makeDuck(k));
+    }
 
-        const t1 = document.createElement("a-text");
-        t1.setAttribute("value", textTop);
-        t1.setAttribute("align", "center");
-        t1.setAttribute("color", "#ffffff");
-        t1.setAttribute("width", "3.2");
-        t1.setAttribute("position", "0 0.55 0.25");
+    setMsg('開始！打到「符合題目」的鴨子。');
+  }
 
-        const t2 = document.createElement("a-text");
-        t2.setAttribute("value", textBottom);
-        t2.setAttribute("align", "center");
-        t2.setAttribute("color", "#e9f2ff");
-        t2.setAttribute("width", "3.6");
-        t2.setAttribute("position", "0 0.2 0.25");
-        t2.setAttribute("scale", "0.85 0.85 0.85");
+  function endRound() {
+    if (round >= ROUND_MAX) {
+      running = false;
+      setMsg(`結束！總分 ${score}。按「重來」再玩一次。`);
+      startBtn.textContent = '再玩一局';
+      return;
+    }
+    round += 1;
+    spawnRound();
+    updateHUD();
+  }
 
-        g.appendChild(body);
-        g.appendChild(beak);
-        g.appendChild(t1);
-        g.appendChild(t2);
+  function resetAll() {
+    running = false;
+    ducks = [];
+    score = 0;
+    streak = 0;
+    round = 1;
+    pickQuestion();
+    updateHUD();
+    setMsg('按「開始」出第一波鴨子。');
+    startBtn.textContent = '開始';
+  }
 
-        g.setAttribute("position", `${x} ${y} ${z}`);
+  // ====== Hit detection ======
+  function toLocalXY(ev) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = (ev.touches && ev.touches[0]) ? ev.touches[0].clientX : ev.clientX;
+    const clientY = (ev.touches && ev.touches[0]) ? ev.touches[0].clientY : ev.clientY;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
 
-        // Fly animation: move across stage
-        const toX = direction === "L2R" ? 8 : -8;
-        g.setAttribute("animation", `property: position; to: ${toX} ${y} ${z}; dur: ${speed}; easing: linear; loop: true;`);
+  function shootAt(x, y) {
+    if (!running) return;
 
-        // Hover feedback
-        g.addEventListener("mouseenter", () => g.setAttribute("scale", "1.08 1.08 1.08"));
-        g.addEventListener("mouseleave", () => g.setAttribute("scale", "1 1 1"));
+    // 從上層開始檢查（後畫的在上面）
+    for (let i = ducks.length - 1; i >= 0; i--) {
+      const d = ducks[i];
+      if (!d.alive) continue;
 
-        // Click (fuse completion also triggers click)
-        g.addEventListener("click", () => onDuckHit(g));
+      if (x >= d.x && x <= d.x + d.w && y >= d.y && y <= d.y + d.h) {
+        // hit
+        d.alive = false;
+        remaining -= 1;
 
-        return g;
-      }
-
-      function spawnRound() {
-        clearDucks();
-        const q = pickQuestion();
-        locked = false;
-
-        // Randomize positions / speeds a little
-        const leftY = 2.2 + Math.random()*0.7;
-        const rightY = 1.6 + Math.random()*0.7;
-
-        const dirA = Math.random() < 0.5 ? "L2R" : "R2L";
-        const dirB = dirA === "L2R" ? "R2L" : "L2R";
-
-        const speedA = 5200 + Math.random()*1200;
-        const speedB = 5200 + Math.random()*1200;
-
-        // Place two ducks (prepaid/credit)
-        const d1 = makeDuck(
-          "prepaid",
-          CHOICES.prepaid.label,
-          CHOICES.prepaid.flow,
-          CHOICES.prepaid.color,
-          dirA === "L2R" ? -8 : 8,
-          leftY,
-          -8,
-          speedA,
-          dirA
-        );
-
-        const d2 = makeDuck(
-          "credit",
-          CHOICES.credit.label,
-          CHOICES.credit.flow,
-          CHOICES.credit.color,
-          dirB === "L2R" ? -8 : 8,
-          rightY,
-          -8,
-          speedB,
-          dirB
-        );
-
-        // Shuffle which one is “upper” visually by y (already random)
-        field.appendChild(d1);
-        field.appendChild(d2);
-
-        // store answer on field for quick access
-        field.dataset.answer = q.answerKey;
-      }
-
-      function flashMessage(text, ok) {
-        hintEl.textContent = text;
-        vibrate(ok ? 15 : 50);
-      }
-
-      function onDuckHit(duckEl) {
-        if (locked) return;
-        locked = true;
-
-        const answer = field.dataset.answer;
-        const picked = duckEl.dataset.choice;
-
-        const correct = (picked === answer);
-
+        const correct = (d.choiceKey === currentQ.answerKey);
         if (correct) {
           score += 10;
           streak += 1;
-          flashMessage("✅ 打對了！下一題！", true);
+          setMsg(`✅ 打中！正確是：${labelOf(currentQ.answerKey)}（${flowOf(currentQ.answerKey)}）`);
         } else {
           score = Math.max(0, score - 5);
           streak = 0;
-          const correctLabel = CHOICES[answer].label + "（" + CHOICES[answer].flow + "）";
-          flashMessage("❌ 打錯了！正確是：" + correctLabel, false);
+          setMsg(`❌ 打錯！正確是：${labelOf(currentQ.answerKey)}（${flowOf(currentQ.answerKey)}）`);
         }
-        setHUD();
 
-        // Next round after short delay
-        setTimeout(() => {
-          qIndex += 1;
-          spawnRound();
-        }, 900);
+        updateHUD();
+
+        if (remaining <= 0 || ducks.every(dd => !dd.alive)) {
+          setTimeout(endRound, 700);
+        }
+        return;
       }
+    }
 
-      // Start
-      setHUD();
+    // miss
+    streak = 0;
+    updateHUD();
+    setMsg('沒打到鴨子…再試一次。');
+  }
+
+  function labelOf(key){
+    const c = CHOICES.find(x => x.key === key);
+    return c ? c.label : key;
+  }
+  function flowOf(key){
+    const c = CHOICES.find(x => x.key === key);
+    return c ? c.flow : '';
+  }
+
+  // ====== Render ======
+  function drawDuck(d) {
+    // body
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = d.color;
+    roundRect(d.x, d.y, d.w, d.h, 14);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // label
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.font = '700 14px system-ui, -apple-system, "Noto Sans TC", sans-serif';
+    const t1 = (d.choiceKey === 'prepaid') ? '儲值卡' : '信用卡';
+    ctx.fillText(t1, d.x + 12, d.y + 26);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.font = '600 13px system-ui, -apple-system, "Noto Sans TC", sans-serif';
+    const t2 = (d.choiceKey === 'prepaid') ? '先儲值 → 再消費' : '先消費 → 後繳款';
+    ctx.fillText(t2, d.x + 12, d.y + 48);
+
+    // tiny "beak"
+    ctx.fillStyle = 'rgba(255,190,80,0.95)';
+    ctx.beginPath();
+    ctx.moveTo(d.x + d.w - 6, d.y + d.h/2 - 6);
+    ctx.lineTo(d.x + d.w + 10, d.y + d.h/2);
+    ctx.lineTo(d.x + d.w - 6, d.y + d.h/2 + 6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r){
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function draw() {
+    const W = gameEl.clientWidth;
+    const H = gameEl.clientHeight;
+
+    // clear
+    ctx.clearRect(0,0,W,H);
+
+    // ground
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(0, H*0.78, W, H*0.22);
+
+    // center reticle
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.arc(W/2, H/2, 10, 0, Math.PI*2);
+    ctx.stroke();
+
+    // ducks
+    ducks.forEach(d => {
+      if (!d.alive) return;
+      drawDuck(d);
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  function tick() {
+    if (!running) { requestAnimationFrame(tick); return; }
+
+    const W = gameEl.clientWidth;
+
+    ducks.forEach(d => {
+      if (!d.alive) return;
+      d.t += 0.04;
+      d.x += d.vx;
+      d.y += Math.sin(d.t) * d.bob;
+
+      // bounce
+      if (d.x < 10) { d.x = 10; d.vx *= -1; }
+      if (d.x + d.w > W - 10) { d.x = W - d.w - 10; d.vx *= -1; }
+    });
+
+    requestAnimationFrame(tick);
+  }
+
+  // ====== Events ======
+  canvas.addEventListener('click', (ev) => {
+    const p = toLocalXY(ev);
+    shootAt(p.x, p.y);
+  });
+  canvas.addEventListener('touchstart', (ev) => {
+    const p = toLocalXY(ev);
+    shootAt(p.x, p.y);
+  }, { passive: true });
+
+  startBtn.addEventListener('click', () => {
+    if (!running) {
+      running = true;
       spawnRound();
-    </script>
-  </a-scene>
+      updateHUD();
+      startBtn.textContent = '進行中…';
+    } else {
+      // no-op
+    }
+  });
+
+  restartBtn.addEventListener('click', () => resetAll());
+
+  // ====== Boot ======
+  resize();
+  pickQuestion();
+  updateHUD();
+  draw();
+  tick();
+})();
+</script>
 </body>
 </html>
