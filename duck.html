@@ -2,577 +2,790 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>2D 打鳥學流程：儲值卡 vs 信用卡</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>2D 打鳥學流程：儲值卡 vs 信用卡（素養導向）</title>
   <style>
     :root{
-      --bg:#06101f;
-      --panel: rgba(0,0,0,.55);
-      --panel2: rgba(255,255,255,.06);
+      --bg:#061018;
+      --panel:rgba(0,0,0,.55);
+      --panel2:rgba(255,255,255,.06);
+      --line:rgba(255,255,255,.14);
       --txt:#eaf2ff;
       --muted:#b7c3da;
-      --good:#43f08a;
-      --bad:#ff5b6a;
-      --warn:#ffd36a;
-      --line: rgba(255,255,255,.14);
+      --good:#42d08a;
+      --bad:#ff6b6a;
+      --warn:#ffd66a;
+      --accent:#6aa9ff;
+      --accent2:#9cffd9;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
     }
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Noto Sans TC",Segoe UI,Roboto,Arial;}
-    #wrap{height:100%;display:grid;grid-template-rows:auto 1fr auto;}
+
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Noto Sans TC","Segoe UI",Roboto,Arial;}
+    #wrap{height:100%;display:grid;grid-template-rows:auto auto 1fr auto;gap:10px;}
 
     header{
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
       padding:12px 14px;
       border-bottom:1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,0));
     }
+    header .title{font-weight:800; letter-spacing:.4px;}
     header .pill{
-      padding:4px 10px;border-radius:999px;
-      border:1px solid var(--line);
+      padding:4px 10px; border-radius:999px;
+      border:1px solid var(--line); background:var(--panel2);
+      font-size:12px; color:var(--muted); white-space:nowrap;
+    }
+    header .spacer{flex:1;}
+    header .ctrl{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;}
+    input[type="range"]{width:160px;}
+    select, button{
       background:var(--panel2);
-      font-size:12px;color:var(--muted);
-      white-space:nowrap;
-    }
-    header b{font-weight:800;color:var(--txt)}
-    #title{font-size:14px;color:var(--muted)}
-    #title b{color:var(--txt)}
-    #controls{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    button{
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.08);
-      color:var(--txt);
-      padding:8px 10px;border-radius:10px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    button:active{transform:translateY(1px)}
-    .small{font-size:12px;color:var(--muted)}
-    select, input[type="range"]{
-      background:rgba(255,255,255,.08);
       color:var(--txt);
       border:1px solid var(--line);
       border-radius:10px;
-      padding:7px 10px;
-      outline:none;
+      padding:8px 10px;
+      cursor:pointer;
     }
-    input[type="range"]{padding:0;height:32px}
+    button{font-weight:700;}
+    button.primary{border-color:rgba(106,169,255,.6); background:rgba(106,169,255,.15);}
+    button.warn{border-color:rgba(255,214,106,.65); background:rgba(255,214,106,.12);}
+
+    #qpanel{
+      margin:0 14px;
+      border:1px solid var(--line);
+      background:var(--panel);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      padding:12px 12px 10px 12px;
+    }
+    #qpanel .row{
+      display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;
+    }
+    #qpanel .qtitle{
+      font-weight:800; font-size:14px; color:#dfe9ff;
+    }
+    #qpanel .qtext{
+      font-size:15px; line-height:1.45; color:#f3f7ff;
+      margin-top:6px;
+    }
+    #qpanel .meta{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:12px;
+      display:flex; gap:10px; flex-wrap:wrap;
+    }
+    .tag{
+      border:1px solid var(--line);
+      background:var(--panel2);
+      padding:3px 8px;
+      border-radius:999px;
+    }
 
     #game{
-      position:relative; overflow:hidden;
-      touch-action: manipulation;
-      cursor: crosshair;
+      position:relative;
+      margin:0 14px;
+      border-radius:18px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
       background:
-        radial-gradient(900px 500px at 20% 20%, rgba(0,255,200,.10), transparent 60%),
-        radial-gradient(900px 500px at 80% 30%, rgba(90,120,255,.10), transparent 60%),
-        radial-gradient(700px 400px at 50% 110%, rgba(255,210,90,.10), transparent 55%),
-        #06101f;
+        radial-gradient(1200px 700px at 50% 120%, rgba(106,169,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 18% 20%, rgba(156,255,217,.10), transparent 55%),
+        radial-gradient(900px 700px at 82% 16%, rgba(255,214,106,.08), transparent 55%),
+        var(--bg);
+      box-shadow:var(--shadow);
+      cursor:crosshair;
+      user-select:none;
+      touch-action:manipulation;
+      min-height:420px;
     }
 
-    /* HUD / Question */
+    /* bottom HUD */
     #hud{
-      position:absolute; left:12px; right:12px; top:12px;
-      background:var(--panel);
+      margin:0 14px 14px 14px;
       border:1px solid var(--line);
-      border-radius:14px;
+      background:var(--panel);
+      border-radius:16px;
+      box-shadow:var(--shadow);
       padding:10px 12px;
       display:grid;
-      gap:6px;
-      backdrop-filter: blur(6px);
+      grid-template-columns: 1fr auto;
+      gap:10px;
+      align-items:center;
     }
-    #qText{
-      font-size:16px;
-      line-height:1.35;
-      font-weight:800;
-      letter-spacing:.2px;
+    #msg{
+      font-size:13px; color:#f0f6ff; line-height:1.35;
     }
-    #qMeta{
-      display:flex; gap:10px; flex-wrap:wrap;
+    #msg b{color:#fff;}
+    #msg .good{color:var(--good);font-weight:800;}
+    #msg .bad{color:var(--bad);font-weight:800;}
+    #msg .warn{color:var(--warn);font-weight:800;}
+    #mini{
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;
       font-size:12px; color:var(--muted);
     }
-    #hintLine{
-      font-size:13px; color:var(--muted);
-      line-height:1.35;
+    #mini .m{padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);}
+
+    /* comparison card */
+    #compare{
+      position:absolute;
+      inset:auto 18px 18px 18px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.62);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      padding:12px 12px 10px 12px;
+      backdrop-filter: blur(6px);
+      display:none;
+    }
+    #compare .headline{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      font-weight:900;
+      color:#f7fbff;
+      letter-spacing:.2px;
+    }
+    #compare .headline .chip{
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.06);
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+    }
+    #compare .oneLine{
+      margin-top:8px;
+      font-size:14px;
+      line-height:1.45;
+      color:#f2f7ff;
+    }
+    #compare table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      margin-top:10px;
+      font-size:13px;
+      overflow:hidden;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+    }
+    #compare th, #compare td{
+      padding:8px 10px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      vertical-align:top;
+    }
+    #compare th{
+      background:rgba(255,255,255,.06);
+      color:#eaf2ff;
+      text-align:left;
+      width:120px;
+      white-space:nowrap;
+    }
+    #compare tr:last-child td, #compare tr:last-child th{border-bottom:none;}
+    #compare .hint{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:12px;
     }
 
-    /* Feedback bar */
-    footer{
-      padding:10px 14px;
-      border-top:1px solid var(--line);
-      background: linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,0));
-    }
-    #feedback{
-      min-height:44px;
-      background:var(--panel);
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:10px 12px;
-      color:var(--txt);
-      line-height:1.35;
-      display:flex;
-      align-items:flex-start;
-      gap:10px;
-    }
-    #feedback .tag{
-      padding:2px 8px;border-radius:999px;font-size:12px;font-weight:900;flex:0 0 auto;
-      border:1px solid var(--line);
-      background:rgba(255,255,255,.08);
-    }
-    #feedback.good .tag{border-color:rgba(67,240,138,.45); color:var(--good)}
-    #feedback.bad .tag{border-color:rgba(255,91,106,.45); color:var(--bad)}
-    #feedback.warn .tag{border-color:rgba(255,211,106,.45); color:var(--warn)}
-    #feedbackText{font-size:13px;color:var(--txt)}
-
-    /* Birds */
+    /* bird */
     .bird{
       position:absolute;
+      width:180px;
+      height:56px;
       display:flex;
       align-items:center;
       gap:10px;
-      padding:10px 12px;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.20);
-      background: rgba(0,0,0,.35);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-      user-select:none;
-      transform: translateZ(0);
+      padding:8px 10px 8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.35);
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+      backdrop-filter: blur(3px);
+      transform: translate3d(0,0,0);
+      will-change: transform;
     }
-    .bird:hover{border-color:rgba(255,255,255,.35)}
-    .bird:active{transform: translateZ(0) scale(.99)}
-    .bird .emoji{
-      font-size:42px;
-      line-height:1;
-      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    .bird:hover{border-color:rgba(255,255,255,.35);}
+    .bird .icon{
+      width:36px; height:36px;
+      flex:0 0 auto;
+      display:grid; place-items:center;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
     }
-    .bird .bubble{
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-      min-width: 140px;
-    }
-    .bird .choice{
-      font-size:14px;
+    .bird .txt{min-width:0;}
+    .bird .txt .top{
       font-weight:900;
-      line-height:1.15;
+      font-size:13px;
+      line-height:1.1;
+      color:#f7fbff;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
-    .bird .sub{
+    .bird .txt .sub{
+      margin-top:4px;
       font-size:12px;
       color:var(--muted);
-      line-height:1.2;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    /* Mobile: bigger tap targets */
-    @media (max-width: 560px){
-      #qText{font-size:15px}
-      .bird{padding:10px 10px;border-radius:16px}
-      .bird .emoji{font-size:44px}
-      .bird .bubble{min-width: 120px}
+    .bird.good{border-color:rgba(66,208,138,.55);}
+    .bird.bad{border-color:rgba(255,107,106,.55);}
+    .bird.neutral{border-color:rgba(255,214,106,.55);}
+
+    /* countdown overlay */
+    #overlay{
+      position:absolute; inset:0;
+      display:none;
+      align-items:center; justify-content:center;
+      background:rgba(0,0,0,.35);
+      backdrop-filter: blur(2px);
+    }
+    #overlay .card{
+      width:min(520px, calc(100% - 36px));
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(0,0,0,.60);
+      box-shadow:var(--shadow);
+      padding:14px 14px 12px 14px;
+    }
+    #overlay .card .big{
+      font-weight:1000;
+      font-size:18px;
+      line-height:1.35;
+    }
+    #overlay .card .small{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+    #overlay .count{
+      margin-top:10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .bar{
+      height:8px; flex:1;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      overflow:hidden;
+    }
+    .bar > i{
+      display:block; height:100%;
+      width:0%;
+      background:linear-gradient(90deg, rgba(106,169,255,.9), rgba(156,255,217,.9));
+    }
+
+    @media (max-width: 520px){
+      .bird{width:160px;}
+      input[type="range"]{width:120px;}
     }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <header>
-      <div id="title"><b>2D 打鳥學流程</b>：儲值卡 vs 信用卡</div>
-      <div class="pill">分數：<b id="score">0</b></div>
-      <div class="pill">連對：<b id="streak">0</b></div>
-      <div class="pill">題號：<b id="qNo">1</b>/<b id="qTotal">1</b></div>
-
-      <div id="controls">
-        <label class="small">速度</label>
-        <input id="speed" type="range" min="0.6" max="1.6" step="0.05" value="1.0" />
-        <label class="small">難度</label>
-        <select id="level">
+<div id="wrap">
+  <header>
+    <div class="title">2D 打鳥學流程：<span style="color:var(--accent2)">儲值卡</span> vs <span style="color:var(--accent)">信用卡</span></div>
+    <div class="pill" id="statScore">分數：0</div>
+    <div class="pill" id="statStreak">連對：0</div>
+    <div class="pill" id="statQ">題號：0/0</div>
+    <div class="spacer"></div>
+    <div class="ctrl">
+      <label>速度
+        <input id="speed" type="range" min="0.5" max="2.2" step="0.05" value="1.0" />
+      </label>
+      <label>難度
+        <select id="difficulty">
           <option value="easy">簡單</option>
           <option value="normal" selected>一般</option>
           <option value="hard">困難</option>
         </select>
-        <button id="btnNext">開始 / 下一題</button>
-        <button id="btnReset">重來</button>
-      </div>
-    </header>
+      </label>
+      <button class="primary" id="btnStart">開始 / 下一題</button>
+      <button class="warn" id="btnReset">重來</button>
+    </div>
+  </header>
 
-    <main id="game" aria-label="game area">
-      <div id="hud">
-        <div id="qText">按「開始 / 下一題」開始。</div>
-        <div id="qMeta">
-          <span>規則：打中「正確流程」那隻鳥</span>
-          <span>提示：看清楚情境中的「扣款時間 / 先付後付」</span>
+  <section id="qpanel">
+    <div class="row">
+      <div style="flex:1;min-width:240px;">
+        <div class="qtitle" id="qtitle">題目（先看 5 秒再開始打鳥）</div>
+        <div class="qtext" id="qtext">按「開始 / 下一題」開始。</div>
+        <div class="meta">
+          <span class="tag" id="tagFocus">焦點：—</span>
+          <span class="tag" id="tagTrap">常見誤區：—</span>
+          <span class="tag" id="tagKey">關鍵線索：—</span>
         </div>
-        <div id="hintLine">（打錯也沒關係，我會告訴你為什麼）</div>
       </div>
-    </main>
+    </div>
+  </section>
 
-    <footer>
-      <div id="feedback" class="warn">
-        <div class="tag">提示</div>
-        <div id="feedbackText">準備好了就按「開始 / 下一題」。如果你覺得太快，把「速度」拉低。</div>
+  <main id="game" aria-label="game">
+    <div id="overlay">
+      <div class="card">
+        <div class="big" id="ovTitle">📌 先讀題目</div>
+        <div class="small" id="ovText">看清楚情境：誰承擔風險？能不能超支？有沒有消費保障？</div>
+        <div class="count">
+          <span id="ovCount">5 秒後開始</span>
+          <div class="bar"><i id="ovBar"></i></div>
+        </div>
       </div>
-    </footer>
-  </div>
+    </div>
+
+    <div id="compare">
+      <div class="headline">
+        <span id="cmpResult">✅</span>
+        <span id="cmpHeadline">本題重點比較</span>
+        <span class="chip" id="cmpChip">—</span>
+      </div>
+      <div class="oneLine" id="cmpOneLine">—</div>
+      <table>
+        <tr>
+          <th>儲值卡</th>
+          <td id="cmpPrepaid">—</td>
+        </tr>
+        <tr>
+          <th>信用卡</th>
+          <td id="cmpCredit">—</td>
+        </tr>
+      </table>
+      <div class="hint" id="cmpHint">按「開始 / 下一題」進下一題。</div>
+    </div>
+  </main>
+
+  <footer id="hud">
+    <div id="msg">
+      <span class="warn">提示：</span>這不是比手快，是比你能不能把「情境」對上「工具特性」。
+    </div>
+    <div id="mini">
+      <div class="m">點擊鳥 = 作答</div>
+      <div class="m">先讀題 5 秒</div>
+      <div class="m">鳥會一直移動</div>
+    </div>
+  </footer>
+</div>
 
 <script>
 (() => {
-  // ---------------------------
-  // 題庫：更「擬真」的情境判斷
-  // ---------------------------
+  // ====== 題庫（素養導向） ======
+  // focus: 本題要練什麼判斷
+  // trap: 常見誤區
+  // key: 看到什麼線索就該想到哪種特性
+  // prepaid: 儲值卡在這題的適配說法
+  // credit: 信用卡在這題的適配說法
   const QUESTIONS = [
     {
-      text: "小明先在卡片裡「儲值 300 元」，再去買飲料。這次消費的錢是什麼時候扣的？",
-      answerFlow: "prepaid",
-      explain: "儲值卡 = 先把錢存進去；消費時就是用「已經存在裡面的錢」。",
-      hint: "關鍵字：『先儲值』→ 先付錢"
+      text: "你是國中生，用遊戲點數買造型。家長希望你「不會超支、也不會欠錢」。你會選哪一種？",
+      answer: "prepaid",
+      focus: "預算控管 / 不負債",
+      trap: "只記得『信用卡比較方便』就亂選",
+      key: "不想欠錢、花多少算多少 → 先有錢再花",
+      prepaid: "先儲值再消費，最多只花到卡內餘額，較不會超支。",
+      credit: "先消費後付款，若自制力不足容易超支，甚至產生循環利息。"
     },
     {
-      text: "小美刷卡買衣服，店家先收到錢，但小美是「月底才一起繳」。這比較像哪一種流程？",
-      answerFlow: "credit",
-      explain: "信用卡 = 銀行先幫你付；你之後（例如月底）再還銀行。",
-      hint: "關鍵字：『月底才繳』→ 先用後付"
+      text: "你在網路購物買到瑕疵品，賣家失聯。你希望有機會向銀行申訴、讓款項先不要被扣走。你會選哪一種？",
+      answer: "credit",
+      focus: "消費爭議 / 交易保障",
+      trap: "只想到『先付/後付』忽略保障機制",
+      key: "交易有爭議、需要申訴管道 → 銀行介入",
+      prepaid: "通常是先付款完成交易，遇到糾紛時，追回款項相對不易。",
+      credit: "常見有爭議款/拒付等處理機制，對消費者保障較高。"
     },
     {
-      text: "如果你一直刷卡但都不繳帳單，最可能發生什麼事？（判斷流程概念）",
-      answerFlow: "credit",
-      explain: "這題在考：信用卡是「欠款」概念，不繳會有利息/違約/信用受損等後果。",
-      hint: "關鍵字：『帳單 / 欠款』→ 信用卡"
+      text: "你月底現金不夠，但必須先買教材。你希望下個月領到零用錢再付也可以。你會選哪一種？",
+      answer: "credit",
+      focus: "現金流 / 延後付款",
+      trap: "把『能先買』誤以為『不用付』",
+      key: "先拿到商品、之後再付款 → 延後付款功能",
+      prepaid: "必須卡內先有錢才能買，現金不夠就無法使用。",
+      credit: "可先消費後付款，能短期調度現金流，但要記得到期繳款。"
     },
     {
-      text: "你買遊戲點數，必須先把金額加到帳號裡，才能扣點數買道具。這是哪一種？",
-      answerFlow: "prepaid",
-      explain: "像點數/交通卡/儲值錢包：先存值，後使用。",
-      hint: "關鍵字：『先加值』→ 儲值"
+      text: "你擔心卡片被盜用，想要「最壞情況損失有上限」。你會選哪一種？",
+      answer: "prepaid",
+      focus: "風險控管 / 損失上限",
+      trap: "以為『信用卡一定比較安全』",
+      key: "想把損失鎖在固定上限 → 只花卡內餘額",
+      prepaid: "最多損失卡內剩餘金額，風險上限較明確。",
+      credit: "若被盜刷可能金額較大（雖可申訴），但短期風險感較高。"
     },
     {
-      text: "刷卡後看到「本期應繳金額」，你可以選擇全繳或最低應繳。這比較像哪一種？",
-      answerFlow: "credit",
-      explain: "『應繳』代表你先用了銀行的錢；信用卡才會有帳單與應繳金額。",
-      hint: "關鍵字：『應繳』→ 信用卡"
+      text: "同學想買昂貴周邊，但家長要求「每月只能花固定金額」。你要幫他選一種工具，讓他不容易超過預算。你會選哪一種？",
+      answer: "prepaid",
+      focus: "自我控制 / 先存後花",
+      trap: "把『額度』誤當成『預算』",
+      key: "固定金額、避免衝動 → 先儲值再花",
+      prepaid: "可先設定每月儲值上限，花完就停，最符合預算管理。",
+      credit: "額度存在容易讓人誤以為『還能刷』，造成衝動消費。"
+    },
+    {
+      text: "你要訂飯店，但飯店會先做「預授權」暫扣一筆押金。你希望押金處理比較彈性、出問題能比較好溝通。你會選哪一種？",
+      answer: "credit",
+      focus: "預授權 / 交易流程彈性",
+      trap: "只用『先付後付』判斷，忽略預授權影響",
+      key: "預授權暫扣、需要彈性 → 信用卡常見",
+      prepaid: "若餘額不足或暫扣影響後續消費，可能不方便。",
+      credit: "預授權處理較常見，交易彈性與後續申訴管道相對完整。"
     }
   ];
 
-  // ---------------------------
-  // 遊戲參數
-  // ---------------------------
-  const game = document.getElementById("game");
-  const qText = document.getElementById("qText");
-  const hintLine = document.getElementById("hintLine");
-  const feedback = document.getElementById("feedback");
-  const feedbackText = document.getElementById("feedbackText");
-  const scoreEl = document.getElementById("score");
-  const streakEl = document.getElementById("streak");
-  const qNoEl = document.getElementById("qNo");
-  const qTotalEl = document.getElementById("qTotal");
-  const btnNext = document.getElementById("btnNext");
-  const btnReset = document.getElementById("btnReset");
-  const speedEl = document.getElementById("speed");
-  const levelEl = document.getElementById("level");
+  // ====== UI refs ======
+  const $ = (id) => document.getElementById(id);
+  const game = $("game");
+  const overlay = $("overlay");
+  const ovCount = $("ovCount");
+  const ovBar = $("ovBar");
+  const qtext = $("qtext");
+  const tagFocus = $("tagFocus");
+  const tagTrap = $("tagTrap");
+  const tagKey = $("tagKey");
 
-  qTotalEl.textContent = String(QUESTIONS.length);
+  const statScore = $("statScore");
+  const statStreak = $("statStreak");
+  const statQ = $("statQ");
+  const msg = $("msg");
 
-  let qIndex = 0;
+  const cmp = $("compare");
+  const cmpResult = $("cmpResult");
+  const cmpHeadline = $("cmpHeadline");
+  const cmpChip = $("cmpChip");
+  const cmpOneLine = $("cmpOneLine");
+  const cmpPrepaid = $("cmpPrepaid");
+  const cmpCredit = $("cmpCredit");
+
+  const btnStart = $("btnStart");
+  const btnReset = $("btnReset");
+  const speedEl = $("speed");
+  const difficultyEl = $("difficulty");
+
+  // ====== game state ======
+  let qIndex = -1;
   let score = 0;
   let streak = 0;
   let locked = false;
-  let activeBirds = [];
-  let rafId = null;
+  let canShoot = false;
 
-  const FLOW_LABEL = {
-    prepaid: "儲值流程（先付）",
-    credit: "信用流程（後付）"
-  };
+  let birds = [];
+  let raf = 0;
 
-  // 鳥外觀（可依答案/干擾做不同鳥）
-  const BIRDS = [
-    { emoji: "🦜", name: "綠鸚鵡" },
-    { emoji: "🦢", name: "白天鵝" },
-    { emoji: "🦉", name: "貓頭鷹" },
-    { emoji: "🕊️", name: "白鴿" },
-    { emoji: "🐦", name: "小藍鳥" }
-  ];
-
-  // 難度決定：鳥數、速度、停留時間
-  function getDifficulty() {
-    const lv = levelEl.value;
-    if (lv === "easy") return { birds: 2, baseSpeed: 90, pauseMs: 1400 };
-    if (lv === "hard") return { birds: 4, baseSpeed: 130, pauseMs: 900 };
-    return { birds: 3, baseSpeed: 110, pauseMs: 1100 }; // normal
+  function setHUD() {
+    statScore.textContent = `分數：${score}`;
+    statStreak.textContent = `連對：${streak}`;
+    statQ.textContent = `題號：${Math.max(0, qIndex+1)}/${QUESTIONS.length}`;
   }
 
-  function setFeedback(kind, tag, text) {
-    feedback.className = kind;
-    feedback.querySelector(".tag").textContent = tag;
-    feedbackText.textContent = text;
-  }
-
-  function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
-  function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
-  function shuffle(arr){
-    for(let i=arr.length-1;i>0;i--){
-      const j=Math.floor(Math.random()*(i+1));
-      [arr[i],arr[j]]=[arr[j],arr[i]];
-    }
-    return arr;
-  }
-
-  // 生成「更不單調」的鳥上文字：主選項 + 副描述
-  function makeChoiceCard(flow, q) {
-    if (q.text.includes("不繳")) {
-      // 風險題：用結果語句做選項
-      return flow === "credit"
-        ? { main: "因為會產生欠款/帳單", sub: "先用後付 → 信用卡邏輯" }
-        : { main: "因為先存值不欠款", sub: "先付錢 → 儲值卡邏輯" };
-    }
-
-    const templates = {
-      prepaid: [
-        { main: "先加值，後扣款", sub: "像點數/交通卡" },
-        { main: "錢先進帳戶", sub: "用的是已存金額" },
-        { main: "扣款發生在消費當下", sub: "因為錢早就存了" },
-      ],
-      credit: [
-        { main: "先消費，後結帳", sub: "月底看帳單" },
-        { main: "銀行先墊款", sub: "你之後再還" },
-        { main: "有應繳金額", sub: "可能利息/信用紀錄" },
-      ]
-    };
-
-    // 讓每題看起來更貼合
-    if (q.text.includes("月底")) {
-      return flow === "credit"
-        ? { main: "月底一起繳", sub: "先用後付（信用）" }
-        : { main: "先加值再買", sub: "先付後用（儲值）" };
-    }
-    if (q.text.includes("儲值") || q.text.includes("加到帳號")) {
-      return flow === "prepaid"
-        ? { main: "先儲值才可買", sub: "先付後用（儲值）" }
-        : { main: "先刷後繳", sub: "先用後付（信用）" };
-    }
-
-    return pick(templates[flow]);
-  }
-
-  // 建鳥
-  function createBird({ flow, y, dir, speedPx, pauseMs, labelMain, labelSub }) {
-    const el = document.createElement("div");
-    el.className = "bird";
-    el.dataset.flow = flow;
-
-    const birdFace = pick(BIRDS);
-
-    el.innerHTML = `
-      <div class="emoji" aria-hidden="true">${birdFace.emoji}</div>
-      <div class="bubble">
-        <div class="choice">${labelMain}</div>
-        <div class="sub">${labelSub}</div>
-      </div>
-    `;
-
-    const rect = game.getBoundingClientRect();
-    const startX = dir === "L2R" ? -260 : rect.width + 260;
-    el.style.left = startX + "px";
-    el.style.top = y + "px";
-
-    // 動態資料
-    const obj = {
-      el,
-      flow,
-      x: startX,
-      y,
-      dir,
-      speedPx,     // px/sec
-      pauseMs,
-      paused: false,
-      pauseUntil: 0,
-      removed: false
-    };
-
-    el.addEventListener("click", () => onHit(obj));
-
-    game.appendChild(el);
-    activeBirds.push(obj);
+  function setMsg(html) {
+    msg.innerHTML = html;
   }
 
   function clearBirds() {
-    activeBirds.forEach(b => {
-      try { b.el.remove(); } catch(e){}
-    });
-    activeBirds = [];
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = null;
+    birds.forEach(b => b.el.remove());
+    birds = [];
   }
 
-  // 一回合出題
-  function spawnRound() {
+  function hideCompare() {
+    cmp.style.display = "none";
+  }
+
+  function showCompare(isCorrect, q, picked) {
+    // 一句比較表（B）
+    const right = q.answer === "prepaid" ? "儲值卡" : "信用卡";
+    const pickedTxt = picked === "prepaid" ? "儲值卡" : "信用卡";
+
+    cmpResult.textContent = isCorrect ? "✅" : "❌";
+    cmpChip.textContent = `你選：${pickedTxt}｜正解：${right}`;
+
+    // headline
+    cmpHeadline.textContent = "本題重點比較（把特性釐清）";
+
+    // one-line compare: 一句話帶走
+    // 用「焦點 + 結論」寫成課堂可以朗讀的句子
+    const line = isCorrect
+      ? `你是用「${q.focus}」在判斷：此情境更適合 <b>${right}</b>。`
+      : `這題不是看手快，是看「${q.focus}」。此情境更適合 <b>${right}</b>，因為：${q.key}。`;
+
+    cmpOneLine.innerHTML = line;
+
+    // table rows: 對照表（兩行）
+    cmpPrepaid.textContent = q.prepaid;
+    cmpCredit.textContent = q.credit;
+
+    cmp.style.display = "block";
+  }
+
+  // ====== Bird SVG (no external assets) ======
+  function birdSVG(kind) {
+    // kind: "prepaid" or "credit" or "decoy"
+    // use different accent colors by kind
+    const fill = kind === "prepaid" ? "#9cffd9" : (kind === "credit" ? "#6aa9ff" : "#ffd66a");
+    const stroke = "rgba(255,255,255,.18)";
+    return `
+      <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M46 18c-7-9-21-9-28 0-7 8-6 20 3 28 9 9 23 10 30 1 6-8 4-18-5-23z"
+              fill="${fill}" opacity="0.95" stroke="${stroke}" stroke-width="2" />
+        <path d="M45 25c5 0 9-4 9-9-5 0-9 4-9 9z" fill="${fill}" opacity="0.75"/>
+        <circle cx="39" cy="28" r="2.6" fill="#0b1020"/>
+        <path d="M21 36c7 4 14 4 22 0" fill="none" stroke="rgba(11,16,32,.35)" stroke-width="3" stroke-linecap="round"/>
+        <path d="M48 33l9 3-9 3z" fill="#ffb36a" opacity="0.9"/>
+      </svg>
+    `;
+  }
+
+  // ====== spawn logic ======
+  function diffConfig() {
+    const d = difficultyEl.value;
+    if (d === "easy") return { total: 2, decoys: 1 };
+    if (d === "hard") return { total: 4, decoys: 2 };
+    return { total: 3, decoys: 1 }; // normal
+  }
+
+  function spawnBirdsForQuestion(q) {
     clearBirds();
-    locked = false;
+    hideCompare();
 
-    const q = QUESTIONS[qIndex];
-    qNoEl.textContent = String(qIndex + 1);
-    qText.textContent = q.text;
-    hintLine.textContent = "提示：" + q.hint;
+    const cfg = diffConfig();
+    // total birds = cfg.total
+    // must include at least one correct and one incorrect of the two options.
+    const correct = q.answer; // "prepaid" or "credit"
+    const wrong = correct === "prepaid" ? "credit" : "prepaid";
 
-    const { birds, baseSpeed, pauseMs } = getDifficulty();
-    const speedMul = parseFloat(speedEl.value || "1.0");
+    // Build bird choices: 1 correct + 1 wrong + decoys (could be duplicates but labeled different)
+    const slots = [];
+    slots.push({ choice: correct, label: correct === "prepaid" ? "儲值卡" : "信用卡", sub: "（較適合本情境）", type: "good" });
+    slots.push({ choice: wrong, label: wrong === "prepaid" ? "儲值卡" : "信用卡", sub: "（看起來也像…但要小心）", type: "bad" });
 
-    // 決定這回合有幾隻鳥要生成
-    // 必定含 1 隻正解，其餘為干擾
-    const flows = [q.answerFlow];
-    while (flows.length < birds) {
-      flows.push(flows.length % 2 === 1 ? (q.answerFlow === "prepaid" ? "credit" : "prepaid") : (Math.random() < .5 ? "prepaid" : "credit"));
+    // decoys: still either prepaid/credit but with misleading subtitle to force thinking
+    const decoyPhrases = [
+      "（因為『方便』就選？）",
+      "（只看『先付/後付』會中招）",
+      "（想想：風險/保障/預算）",
+      "（關鍵線索在哪？）",
+      "（先別急，回到情境）"
+    ];
+    for (let i=0; i<cfg.total-2; i++) {
+      const pick = (i % 2 === 0) ? wrong : correct; // alternate to increase confusion
+      slots.push({
+        choice: pick,
+        label: pick === "prepaid" ? "儲值卡" : "信用卡",
+        sub: decoyPhrases[(Math.random()*decoyPhrases.length)|0],
+        type: "neutral"
+      });
     }
-    shuffle(flows);
 
-    // 生成位置：分散，避免疊在一起
-    const rect = game.getBoundingClientRect();
-    const topSafe = 100;
-    const bottomSafe = 80;
-    const laneCount = birds;
-    const laneGap = Math.max(70, (rect.height - topSafe - bottomSafe) / Math.max(1, laneCount));
-    const lanes = [];
-    for (let i = 0; i < laneCount; i++) lanes.push(topSafe + i * laneGap);
-    shuffle(lanes);
+    // Create DOM birds
+    slots.forEach((s, idx) => {
+      const el = document.createElement("div");
+      el.className = `bird ${s.type}`;
+      el.dataset.choice = s.choice;
 
-    flows.forEach((flow, i) => {
-      const dir = Math.random() < 0.5 ? "L2R" : "R2L";
+      el.innerHTML = `
+        <div class="icon">${birdSVG(s.choice === "prepaid" ? "prepaid" : "credit")}</div>
+        <div class="txt">
+          <div class="top">${s.label}</div>
+          <div class="sub">${s.sub}</div>
+        </div>
+      `;
 
-      const card = makeChoiceCard(flow, q);
-      const s = (baseSpeed * speedMul) * (0.85 + Math.random() * 0.35); // 有點差異但不會亂
-      const p = pauseMs + randInt(-150, 200);
+      // click handler
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onBirdHit(el);
+      });
 
-      createBird({
-        flow,
-        y: Math.min(rect.height - bottomSafe, lanes[i] || (topSafe + i * 85)),
-        dir,
-        speedPx: s,
-        pauseMs: p,
-        labelMain: card.main,
-        labelSub: card.sub
+      game.appendChild(el);
+
+      // movement params
+      const bw = 180;
+      const bh = 56;
+      const pad = 12;
+
+      const x0 = pad + Math.random() * (game.clientWidth - bw - pad*2);
+      const y0 = 90 + Math.random() * (game.clientHeight - bh - 110);
+      const dirx = Math.random() > 0.5 ? 1 : -1;
+      const diry = Math.random() > 0.5 ? 1 : -1;
+
+      // base speed (slower than before) * slider * slight random
+      const base = 0.55 + Math.random()*0.35; // slow-friendly
+      const vx = dirx * base * (0.9 + Math.random()*0.35);
+      const vy = diry * base * (0.7 + Math.random()*0.35);
+
+      birds.push({
+        el,
+        x: x0, y: y0,
+        vx, vy,
+        w: bw, h: bh
       });
     });
 
-    setFeedback("warn", "提示", "請打中「正確流程」那隻鳥。（看清楚：先付？後付？）");
-    rafId = requestAnimationFrame(loop);
+    // Start RAF movement
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(tick);
   }
 
-  // 遊戲主迴圈：慢速、停一下，讓字能看清楚
-  let lastT = 0;
-  function loop(t) {
-    if (!lastT) lastT = t;
-    const dt = (t - lastT) / 1000;
-    lastT = t;
+  function tick() {
+    const sp = parseFloat(speedEl.value || "1.0");
+    const W = game.clientWidth;
+    const H = game.clientHeight;
 
-    const rect = game.getBoundingClientRect();
+    const minY = 84;
+    const maxY = H - 70;
 
-    for (const b of activeBirds) {
-      if (b.removed) continue;
+    birds.forEach(b => {
+      // keep moving forever
+      b.x += b.vx * sp;
+      b.y += b.vy * sp;
 
-      // 停一下（中段 pause，讓學生有時間看字）
-      if (!b.paused) {
-        const mid = rect.width / 2;
-        if ((b.dir === "L2R" && b.x >= mid - 40 && b.x <= mid + 40) ||
-            (b.dir === "R2L" && b.x <= mid + 40 && b.x >= mid - 40)) {
-          b.paused = true;
-          b.pauseUntil = performance.now() + b.pauseMs;
-        }
-      } else {
-        if (performance.now() < b.pauseUntil) {
-          // 還在停
-          b.el.style.left = b.x + "px";
-          continue;
-        } else {
-          b.paused = false;
-        }
-      }
+      // bounce
+      if (b.x < 10) { b.x = 10; b.vx *= -1; }
+      if (b.x > W - b.w - 10) { b.x = W - b.w - 10; b.vx *= -1; }
 
-      const v = b.speedPx; // px/sec
-      b.x += (b.dir === "L2R" ? 1 : -1) * v * dt;
+      if (b.y < minY) { b.y = minY; b.vy *= -1; }
+      if (b.y > maxY - b.h) { b.y = maxY - b.h; b.vy *= -1; }
 
-      b.el.style.left = b.x + "px";
-
-      // 出界刪除
-      if (b.dir === "L2R" && b.x > rect.width + 300) b.removed = true;
-      if (b.dir === "R2L" && b.x < -320) b.removed = true;
-    }
-
-    // 清除出界
-    const before = activeBirds.length;
-    activeBirds = activeBirds.filter(b => {
-      if (!b.removed) return true;
-      try { b.el.remove(); } catch(e){}
-      return false;
+      b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
     });
 
-    // 如果鳥都飛走了還沒答題：提示並重生
-    if (!locked && activeBirds.length === 0 && before > 0) {
-      setFeedback("warn", "提示", "你沒打到任何鳥，再給你一次（慢慢來）！");
-      spawnRound();
-      return;
-    }
-
-    rafId = requestAnimationFrame(loop);
+    raf = requestAnimationFrame(tick);
   }
 
-  // 點中鳥
-  function onHit(b) {
+  // ====== answer handling ======
+  function onBirdHit(el) {
+    if (!canShoot) return;
     if (locked) return;
     locked = true;
 
     const q = QUESTIONS[qIndex];
-    const correct = (b.flow === q.answerFlow);
+    const picked = el.dataset.choice;
+    const correct = (picked === q.answer);
 
     if (correct) {
       score += 10;
       streak += 1;
-      setFeedback("good", "✔ 正確", `你選的是「${FLOW_LABEL[b.flow]}」。${q.explain}`);
+      setMsg(`<span class="good">✅ 打中！</span> 你是用「<b>${q.focus}</b>」在判斷，做得好。`);
     } else {
       score = Math.max(0, score - 5);
       streak = 0;
-      const rightLabel = FLOW_LABEL[q.answerFlow];
-      setFeedback("bad", "✘ 錯誤", `正確應該是「${rightLabel}」。原因：${q.explain}`);
+      setMsg(`<span class="bad">❌ 打錯！</span> 這題的關鍵是「<b>${q.focus}</b>」，線索：<b>${q.key}</b>。`);
     }
 
-    scoreEl.textContent = String(score);
-    streakEl.textContent = String(streak);
+    setHUD();
+    clearBirds();
+    showCompare(correct, q, picked);
 
-    // 讓玩家看完解釋，再自動下一題
-    setTimeout(() => {
-      nextQuestion();
-    }, 1200);
+    // unlock after short moment, but keep compare shown until next
+    setTimeout(() => { locked = false; }, 300);
+  }
+
+  // ====== countdown (5 sec) ======
+  function showOverlay(q) {
+    overlay.style.display = "flex";
+    const total = 5;
+    let t = total;
+
+    ovCount.textContent = `${t} 秒後開始`;
+    ovBar.style.width = "0%";
+
+    const start = performance.now();
+    const duration = total * 1000;
+
+    function step(now) {
+      const p = Math.min(1, (now - start) / duration);
+      ovBar.style.width = `${Math.floor(p * 100)}%`;
+
+      const left = Math.max(0, Math.ceil(total - p*total));
+      if (left !== t) {
+        t = left;
+        ovCount.textContent = `${t} 秒後開始`;
+      }
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        overlay.style.display = "none";
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ====== round flow ======
+  function showQuestion(q) {
+    qtext.textContent = q.text;
+    tagFocus.textContent = `焦點：${q.focus}`;
+    tagTrap.textContent = `常見誤區：${q.trap}`;
+    tagKey.textContent = `關鍵線索：${q.key}`;
   }
 
   function nextQuestion() {
-    qIndex = (qIndex + 1) % QUESTIONS.length;
-    spawnRound();
+    // If already ended, loop to start
+    qIndex += 1;
+    if (qIndex >= QUESTIONS.length) {
+      qIndex = 0;
+      score = 0;
+      streak = 0;
+      setMsg(`<span class="warn">已回到第一題。</span> 想挑戰看看能不能全對？`);
+    }
+    setHUD();
+
+    canShoot = false;
+    hideCompare();
+    clearBirds();
+
+    const q = QUESTIONS[qIndex];
+    showQuestion(q);
+
+    // 先亮題 5 秒
+    showOverlay(q);
+    setMsg(`<span class="warn">📌 先讀題：</span> 看「誰承擔風險、能不能超支、有沒有保障」——5 秒後開始。`);
+
+    setTimeout(() => {
+      canShoot = true;
+      spawnBirdsForQuestion(q);
+      setMsg(`<span class="good">開始！</span> 依照情境判斷，打中你認為正確的那隻鳥。`);
+    }, 5000);
   }
 
   function resetAll() {
-    qIndex = 0;
+    qIndex = -1;
     score = 0;
     streak = 0;
-    scoreEl.textContent = "0";
-    streakEl.textContent = "0";
-    qNoEl.textContent = "1";
-    setFeedback("warn", "提示", "已重來。按「開始 / 下一題」開始。");
-    clearBirds();
-    qText.textContent = "按「開始 / 下一題」開始。";
-    hintLine.textContent = "（打錯也沒關係，我會告訴你為什麼）";
     locked = false;
+    canShoot = false;
+    clearBirds();
+    hideCompare();
+    qtext.textContent = "按「開始 / 下一題」開始。";
+    tagFocus.textContent = "焦點：—";
+    tagTrap.textContent = "常見誤區：—";
+    tagKey.textContent = "關鍵線索：—";
+    setHUD();
+    setMsg(`<span class="warn">提示：</span>這不是比手快，是比你能不能把「情境」對上「工具特性」。`);
   }
 
-  // Buttons
-  btnNext.addEventListener("click", () => {
-    // 第一次按：從第 0 題開始
-    spawnRound();
-  });
-  btnReset.addEventListener("click", resetAll);
-
-  // 改速度/難度：下一回合生效（避免中途亂跳）
-  speedEl.addEventListener("input", () => {
-    setFeedback("warn", "提示", `速度已調整：${speedEl.value}（下一題生效）`);
-  });
-  levelEl.addEventListener("change", () => {
-    setFeedback("warn", "提示", `難度已切換：${levelEl.options[levelEl.selectedIndex].text}（下一題生效）`);
+  // ====== Events ======
+  btnStart.addEventListener("click", () => {
+    nextQuestion();
   });
 
-  // 初始
-  resetAll();
+  btnReset.addEventListener("click", () => {
+    resetAll();
+  });
+
+  // keep birds bouncing on resize
+  window.addEventListener("resize", () => {
+    // birds will bounce naturally; no need to reset positions
+  });
+
+  // init
+  setHUD();
+  statQ.textContent = `題號：0/${QUESTIONS.length}`;
 })();
 </script>
 </body>
