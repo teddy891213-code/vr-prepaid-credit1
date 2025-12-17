@@ -1,193 +1,277 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>手機 VR：儲值卡 vs 信用卡（流程走一趟）</title>
-
+  <title>VR 打鴨子：儲值卡 vs 信用卡</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
   <style>
     html, body { margin:0; height:100%; background:#000; font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif; }
     #hud{
-      position: fixed; left:0; right:0; bottom:0;
-      background: rgba(0,0,0,.65); color:#fff;
-      padding: 10px 12px; z-index: 999;
-      font-size: 14px; line-height: 1.35;
+      position:fixed; left:0; right:0; bottom:0;
+      padding:10px 12px;
+      background: rgba(0,0,0,0.6);
+      color:#fff;
+      z-index: 9999;
+      line-height:1.35;
       backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      font-size:14px;
     }
-    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-    .pill{border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:2px 10px; font-size:12px; opacity:.95;}
+    #hud .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    #hud .pill{
+      border:1px solid rgba(255,255,255,0.25);
+      border-radius:999px;
+      padding:2px 10px;
+      font-size:12px;
+      opacity:.95;
+    }
+    #hud b{ font-weight:800; }
   </style>
 </head>
 
 <body>
   <div id="hud">
     <div class="row">
-      <div class="pill">操作：凝視 1.2 秒 / 點擊</div>
-      <div class="pill" id="modePill">模式：未選擇流程</div>
-      <div class="pill" id="progPill">進度：—</div>
+      <div class="pill">操作：凝視 1 秒 或 點擊</div>
+      <div class="pill">分數：<span id="score">0</span></div>
+      <div class="pill">連對：<span id="streak">0</span></div>
     </div>
-    <div style="margin-top:6px"><b>提示：</b><span id="hintText">請看「入口牌」選擇流程</span></div>
+    <div style="margin-top:6px">
+      <b>題目：</b><span id="question">載入中…</span>
+    </div>
+    <div style="margin-top:4px; opacity:.9">
+      <b>提示：</b><span id="hint">打到寫著「正確流程」的鴨子。</span>
+    </div>
   </div>
 
-  <a-scene background="color:#0b0f1a" vr-mode-ui="enabled:true" device-orientation-permission-ui="enabled:true">
-    <!-- lights -->
-    <a-entity light="type:ambient; intensity:0.65"></a-entity>
+  <a-scene background="color:#0b1020" vr-mode-ui="enabled:true" device-orientation-permission-ui="enabled:true">
+    <a-entity light="type:ambient; intensity:0.75"></a-entity>
     <a-entity light="type:directional; intensity:0.9" position="1 3 2"></a-entity>
 
-    <!-- floor -->
-    <a-plane rotation="-90 0 0" width="30" height="30" color="#1f2433"></a-plane>
+    <a-plane rotation="-90 0 0" width="50" height="50" color="#141a2b"></a-plane>
+    <a-sky color="#070b14"></a-sky>
 
-    <!-- camera + cursor (gaze) -->
-    <a-entity position="0 1.6 6">
+    <!-- Camera + cursor (gaze fuse + click) -->
+    <a-entity id="rig" position="0 1.6 6">
       <a-camera wasd-controls-enabled="false">
-        <a-cursor fuse="true" fuseTimeout="1200" raycaster="objects: .interactable"></a-cursor>
+        <a-cursor
+          id="cursor"
+          fuse="true"
+          fuseTimeout="1000"
+          raycaster="objects: .duck"
+        ></a-cursor>
       </a-camera>
     </a-entity>
 
-    <!-- ===== ENTRANCE ===== -->
-    <a-entity position="0 1.6 -1.5">
-      <!-- prepaid -->
-      <a-box id="choosePrepaid" class="interactable" position="-1.7 0 0" width="1.6" height="1" depth="0.18" color="#2b7a78"></a-box>
-      <a-text value="儲值卡流程" align="center" color="#fff" width="6" position="-1.7 0.1 0.25"></a-text>
-      <a-text value="先儲值 → 再消費" align="center" color="#d7fffe" width="6" position="-1.7 -0.35 0.25"></a-text>
+    <!-- Simple stage frame -->
+    <a-box position="0 1.2 -8" width="18" height="6" depth="0.4" color="#0f1430" material="opacity:0.7"></a-box>
 
-      <!-- credit -->
-      <a-box id="chooseCredit" class="interactable" position="1.7 0 0" width="1.6" height="1" depth="0.18" color="#3b5bdb"></a-box>
-      <a-text value="信用卡流程" align="center" color="#fff" width="6" position="1.7 0.1 0.25"></a-text>
-      <a-text value="先消費 → 後繳款" align="center" color="#dbe7ff" width="6" position="1.7 -0.35 0.25"></a-text>
+    <!-- Ducks container -->
+    <a-entity id="duckField"></a-entity>
 
-      <a-text value="請選擇一條流程" align="center" color="#ffffff" width="10" position="0 1.1 0"></a-text>
-    </a-entity>
-
-    <!-- ===== PREPAID STATIONS (left lane) ===== -->
-    <a-entity position="-4 0 -4">
-      <a-text value="儲值卡（預付）" align="center" color="#9ff5f2" width="10" position="0 2.4 0"></a-text>
-
-      <a-box id="p1" class="interactable" position="0 1 0" width="1.8" height="1.1" depth="0.6" color="#2b7a78"></a-box>
-      <a-text value="① 儲值" align="center" color="#fff" width="6" position="0 1.75 0.45"></a-text>
-      <a-text value="先把錢存進卡裡" align="center" color="#e9fffe" width="6" position="0 1.35 0.45"></a-text>
-
-      <a-box id="p2" class="interactable" position="0 1 -3.2" width="1.8" height="1.1" depth="0.6" color="#2b7a78"></a-box>
-      <a-text value="② 消費" align="center" color="#fff" width="6" position="0 1.75 -2.75"></a-text>
-      <a-text value="扣卡內餘額" align="center" color="#e9fffe" width="6" position="0 1.35 -2.75"></a-text>
-
-      <a-box id="p3" class="interactable" position="0 1 -6.4" width="1.8" height="1.1" depth="0.6" color="#2b7a78"></a-box>
-      <a-text value="③ 完成" align="center" color="#fff" width="6" position="0 1.75 -5.95"></a-text>
-      <a-text value="交易完成：餘額變少" align="center" color="#e9fffe" width="8" position="0 1.35 -5.95"></a-text>
-    </a-entity>
-
-    <!-- ===== CREDIT STATIONS (right lane) ===== -->
-    <a-entity position="4 0 -4">
-      <a-text value="信用卡（延後給付）" align="center" color="#b8c7ff" width="12" position="0 2.4 0"></a-text>
-
-      <a-box id="c1" class="interactable" position="0 1 0" width="1.8" height="1.1" depth="0.6" color="#3b5bdb"></a-box>
-      <a-text value="① 消費" align="center" color="#fff" width="6" position="0 1.75 0.45"></a-text>
-      <a-text value="先拿到商品" align="center" color="#eef1ff" width="6" position="0 1.35 0.45"></a-text>
-
-      <a-box id="c2" class="interactable" position="0 1 -3.2" width="1.8" height="1.1" depth="0.6" color="#3b5bdb"></a-box>
-      <a-text value="② 銀行先墊款" align="center" color="#fff" width="10" position="0 1.75 -2.75"></a-text>
-      <a-text value="銀行先付給商店" align="center" color="#eef1ff" width="8" position="0 1.35 -2.75"></a-text>
-
-      <a-box id="c3" class="interactable" position="0 1 -6.4" width="1.8" height="1.1" depth="0.6" color="#3b5bdb"></a-box>
-      <a-text value="③ 繳款" align="center" color="#fff" width="6" position="0 1.75 -5.95"></a-text>
-      <a-text value="月底帳單→付銀行" align="center" color="#eef1ff" width="10" position="0 1.35 -5.95"></a-text>
-    </a-entity>
-
-    <!-- hover feedback -->
-    <a-entity id="hoverHint" position="0 2.8 2">
-      <a-text id="hoverText" value="" align="center" color="#ffffff" width="10"></a-text>
-    </a-entity>
-
-    <a-sky color="#0b0f1a"></a-sky>
+    <!-- 3D tiny helper text (optional) -->
+    <a-text value="VR 打鴨子：儲值卡 vs 信用卡" position="0 3.6 -6.5" align="center" width="10" color="#ffffff"></a-text>
 
     <script>
-      // ====== HUD ======
-      const modePill = document.getElementById('modePill');
-      const progPill = document.getElementById('progPill');
-      const hintText = document.getElementById('hintText');
-      const hoverText = document.getElementById('hoverText');
-
-      // ====== state machine ======
-      const state = { flow: null, step: 0, max: 3 };
-
-      const FLOW = {
-        prepaid: { order: ['p1','p2','p3'], label: '儲值卡流程', hint: '請依序：①儲值 → ②消費 → ③完成' },
-        credit:  { order: ['c1','c2','c3'], label: '信用卡流程', hint: '請依序：①消費 → ②銀行先墊款 → ③繳款' }
+      // -----------------------------
+      // Game data (兩個選項)
+      // -----------------------------
+      const CHOICES = {
+        prepaid:  { label: "儲值卡",  flow: "先儲值 → 再消費", color: "#2b7a78" },
+        credit:   { label: "信用卡",  flow: "先消費 → 後繳款", color: "#3b5bdb" }
       };
 
-      function setMode(text){ modePill.textContent = '模式：' + text; }
-      function setProg(text){ progPill.textContent = '進度：' + text; }
-      function setHint(text){ hintText.textContent = text; }
+      const QUESTIONS = [
+        { ask: "哪一個是「儲值卡」的正確流程？", answerKey: "prepaid" },
+        { ask: "哪一個是「信用卡」的正確流程？", answerKey: "credit" },
+        { ask: "誰是「先儲值，再消費」？", answerKey: "prepaid" },
+        { ask: "誰是「先消費，月底再繳款」？", answerKey: "credit" },
+      ];
 
-      function reset(flow){
-        state.flow = flow;
-        state.step = 0;
-        setMode(FLOW[flow].label);
-        setProg('0/3');
-        setHint(FLOW[flow].hint);
+      // -----------------------------
+      // DOM refs
+      // -----------------------------
+      const scoreEl = document.getElementById("score");
+      const streakEl = document.getElementById("streak");
+      const questionEl = document.getElementById("question");
+      const hintEl = document.getElementById("hint");
+
+      // -----------------------------
+      // State
+      // -----------------------------
+      let score = 0;
+      let streak = 0;
+      let qIndex = 0;
+      let locked = false; // prevent double hits
+
+      function setHUD() {
+        scoreEl.textContent = String(score);
+        streakEl.textContent = String(streak);
       }
 
-      function touchStation(id){
-        if(!state.flow){
-          setHint('你還沒選流程：請先看入口牌選「儲值卡」或「信用卡」。');
-          return;
-        }
-        const seq = FLOW[state.flow].order;
-        const expectedId = seq[state.step];
-
-        // wrong lane
-        const isOtherLane = !seq.includes(id);
-        if(isOtherLane){
-          setHint('你點到另一條流程的站點了。請回到你選的流程走完。');
-          return;
-        }
-
-        // wrong order
-        if(id !== expectedId){
-          setHint(`順序不對！現在應該做：${state.step+1} / 3`);
-          setProg(`${state.step}/3`);
-          return;
-        }
-
-        // correct
-        state.step += 1;
-        setProg(`${state.step}/3`);
-
-        if(state.step >= state.max){
-          setHint(state.flow === 'prepaid'
-            ? '✅ 完成！儲值卡＝先儲值（預付）→再消費（扣餘額）。你可以回入口改選信用卡比較。'
-            : '✅ 完成！信用卡＝先消費→銀行先墊款→你之後繳款（延後給付）。你可以回入口改選儲值卡比較。'
-          );
-        }else{
-          setHint('✅ 正確！請前往下一站。');
-        }
+      function pickQuestion() {
+        const q = QUESTIONS[qIndex % QUESTIONS.length];
+        questionEl.textContent = q.ask;
+        hintEl.textContent = "打到寫著「正確流程」的鴨子。";
+        return q;
       }
 
-      // bind interactables
-      document.querySelectorAll('.interactable').forEach(el=>{
-        el.addEventListener('click', ()=>{
-          const id = el.id;
-          if(id === 'choosePrepaid') return reset('prepaid');
-          if(id === 'chooseCredit')  return reset('credit');
-          return touchStation(id);
-        });
+      function vibrate(ms){
+        try { if (navigator.vibrate) navigator.vibrate(ms); } catch(_) {}
+      }
 
-        el.addEventListener('mouseenter', ()=>{
-          el.setAttribute('scale','1.08 1.08 1.08');
-          hoverText.setAttribute('value', el.id || '');
-        });
-        el.addEventListener('mouseleave', ()=>{
-          el.setAttribute('scale','1 1 1');
-          hoverText.setAttribute('value','');
-        });
-      });
+      // -----------------------------
+      // A-Frame helpers
+      // -----------------------------
+      const field = document.getElementById("duckField");
 
-      // init
-      setMode('未選擇流程');
-      setProg('—');
-      setHint('請看「入口牌」選擇流程（凝視 1.2 秒或點一下）。');
+      function clearDucks() {
+        while (field.firstChild) field.removeChild(field.firstChild);
+      }
+
+      function makeDuck(id, textTop, textBottom, color, x, y, z, speed, direction) {
+        // Duck body
+        const g = document.createElement("a-entity");
+        g.setAttribute("class", "duck");
+        g.setAttribute("id", id);
+        g.dataset.choice = id; // 'prepaid' / 'credit'
+
+        // Simple “duck” look: box + beak
+        const body = document.createElement("a-box");
+        body.setAttribute("width", "1.2");
+        body.setAttribute("height", "0.7");
+        body.setAttribute("depth", "0.4");
+        body.setAttribute("color", color);
+
+        const beak = document.createElement("a-cone");
+        beak.setAttribute("radius-bottom", "0.12");
+        beak.setAttribute("radius-top", "0.01");
+        beak.setAttribute("height", "0.25");
+        beak.setAttribute("color", "#f4a261");
+        beak.setAttribute("position", "0.65 0 0");
+        beak.setAttribute("rotation", "0 0 -90");
+
+        const t1 = document.createElement("a-text");
+        t1.setAttribute("value", textTop);
+        t1.setAttribute("align", "center");
+        t1.setAttribute("color", "#ffffff");
+        t1.setAttribute("width", "3.2");
+        t1.setAttribute("position", "0 0.55 0.25");
+
+        const t2 = document.createElement("a-text");
+        t2.setAttribute("value", textBottom);
+        t2.setAttribute("align", "center");
+        t2.setAttribute("color", "#e9f2ff");
+        t2.setAttribute("width", "3.6");
+        t2.setAttribute("position", "0 0.2 0.25");
+        t2.setAttribute("scale", "0.85 0.85 0.85");
+
+        g.appendChild(body);
+        g.appendChild(beak);
+        g.appendChild(t1);
+        g.appendChild(t2);
+
+        g.setAttribute("position", `${x} ${y} ${z}`);
+
+        // Fly animation: move across stage
+        const toX = direction === "L2R" ? 8 : -8;
+        g.setAttribute("animation", `property: position; to: ${toX} ${y} ${z}; dur: ${speed}; easing: linear; loop: true;`);
+
+        // Hover feedback
+        g.addEventListener("mouseenter", () => g.setAttribute("scale", "1.08 1.08 1.08"));
+        g.addEventListener("mouseleave", () => g.setAttribute("scale", "1 1 1"));
+
+        // Click (fuse completion also triggers click)
+        g.addEventListener("click", () => onDuckHit(g));
+
+        return g;
+      }
+
+      function spawnRound() {
+        clearDucks();
+        const q = pickQuestion();
+        locked = false;
+
+        // Randomize positions / speeds a little
+        const leftY = 2.2 + Math.random()*0.7;
+        const rightY = 1.6 + Math.random()*0.7;
+
+        const dirA = Math.random() < 0.5 ? "L2R" : "R2L";
+        const dirB = dirA === "L2R" ? "R2L" : "L2R";
+
+        const speedA = 5200 + Math.random()*1200;
+        const speedB = 5200 + Math.random()*1200;
+
+        // Place two ducks (prepaid/credit)
+        const d1 = makeDuck(
+          "prepaid",
+          CHOICES.prepaid.label,
+          CHOICES.prepaid.flow,
+          CHOICES.prepaid.color,
+          dirA === "L2R" ? -8 : 8,
+          leftY,
+          -8,
+          speedA,
+          dirA
+        );
+
+        const d2 = makeDuck(
+          "credit",
+          CHOICES.credit.label,
+          CHOICES.credit.flow,
+          CHOICES.credit.color,
+          dirB === "L2R" ? -8 : 8,
+          rightY,
+          -8,
+          speedB,
+          dirB
+        );
+
+        // Shuffle which one is “upper” visually by y (already random)
+        field.appendChild(d1);
+        field.appendChild(d2);
+
+        // store answer on field for quick access
+        field.dataset.answer = q.answerKey;
+      }
+
+      function flashMessage(text, ok) {
+        hintEl.textContent = text;
+        vibrate(ok ? 15 : 50);
+      }
+
+      function onDuckHit(duckEl) {
+        if (locked) return;
+        locked = true;
+
+        const answer = field.dataset.answer;
+        const picked = duckEl.dataset.choice;
+
+        const correct = (picked === answer);
+
+        if (correct) {
+          score += 10;
+          streak += 1;
+          flashMessage("✅ 打對了！下一題！", true);
+        } else {
+          score = Math.max(0, score - 5);
+          streak = 0;
+          const correctLabel = CHOICES[answer].label + "（" + CHOICES[answer].flow + "）";
+          flashMessage("❌ 打錯了！正確是：" + correctLabel, false);
+        }
+        setHUD();
+
+        // Next round after short delay
+        setTimeout(() => {
+          qIndex += 1;
+          spawnRound();
+        }, 900);
+      }
+
+      // Start
+      setHUD();
+      spawnRound();
     </script>
   </a-scene>
 </body>
